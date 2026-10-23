@@ -1,0 +1,15 @@
+# Changelog
+
+## 3.1.0 — review candidate
+
+- Rename the settings page to Model Request Controls / 模型请求控制.
+- Default to the native User-Agent, with explicit Claude Code, Codex, pi and custom presets.
+- Preserve provider URLs and authentication headers exactly as supplied by Harness.
+- Keep all retry decisions in the native agent recovery flow, with visible counters and fixed configurable delays.
+- Support finite or unlimited retries, and optional bounded continuation messages.
+- Expose each provider's native stream idle timeout in seconds.
+- Apply tool-schema and empty-stream-event normalization consistently across providers.
+- Show contextual descriptions for the selected User-Agent and recovery modes.
+- Include documentation, configuration examples, reproducible tests and a review package workflow.
+
+The package and settings identifiers remain unchanged for existing local installations. This candidate has not been published.

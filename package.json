@@ -1,0 +1,23 @@
+{
+  "name": "model-request-controls-workspace",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test verification/client.test.mjs verification/user-agent.test.mjs verification/transport.test.mjs verification/recovery.test.mjs verification/native.test.mjs verification/schema.test.mjs",
+    "test:ui": "node verification/settings-layout.mjs",
+    "check:release": "node scripts/release-check.mjs",
+    "pack:review": "node scripts/pack-review.mjs"
+  },
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "4.0.5",
+    "@deepseek-ai/dsh-llm": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-llm-pi-ai": "0.2.1-rc.2",
+    "@deepseek-ai/schemastery": "3.18.5",
+    "playwright": "1.58.2",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  }
+}

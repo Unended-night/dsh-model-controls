@@ -1,0 +1,7 @@
+# Replace example-provider with the ID of an EXISTING native model provider.
+# This is a partial override, not a complete provider definition.
+- id: llm-pi-ai
+  config:
+    providers:
+      example-provider:
+        streamIdleTimeoutMs: 600000

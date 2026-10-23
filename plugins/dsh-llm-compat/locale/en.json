@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Model Request Controls",
+    "description": "Choose a User-Agent, configure model request retries, optional continuation messages, and per-provider stream idle timeouts."
+  }
+}

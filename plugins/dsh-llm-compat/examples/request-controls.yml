@@ -1,0 +1,13 @@
+# Override the entry already registered by the plugin bundle.
+# Merge this section into the existing profile; do not register a second instance.
+- id: llm-compat
+  config:
+    enabled: true
+    headerMode: native
+    recoveryMode: retry
+    maxRetries: 5
+    retryDelaySeconds: 2
+    retryForever: false
+    maxAutoContinues: 3
+    continueDelaySeconds: 2
+    continueMessage: 请继续完成。
