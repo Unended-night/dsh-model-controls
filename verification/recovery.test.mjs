@@ -1,8 +1,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
-import { installRequestRecovery } from '../plugins/dsh-llm-compat/lib/recovery.js'
-import { createCompatibleFetch } from '../plugins/dsh-llm-compat/lib/transport.js'
+import { installRequestRecovery } from '../plugins/dsh-model-controls/lib/recovery.js'
+import { createCompatibleFetch } from '../plugins/dsh-model-controls/lib/transport.js'
 import { importCurrent } from './current-runtime.mjs'
 const { createUserMessage } = await importCurrent('@deepseek-ai/dsh-llm')
 

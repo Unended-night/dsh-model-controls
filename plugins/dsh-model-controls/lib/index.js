@@ -10,7 +10,7 @@ import { join } from 'node:path'
 const { default: z } = await importRuntime('@deepseek-ai/schemastery')
 const { createUserMessage } = await importRuntime('@deepseek-ai/dsh-llm')
 
-export const name = 'llm-compat'
+export const name = 'model-controls'
 export const inject = ['agents', 'llm']
 const headerMode = () => z.union([
   z.const('native').description('原生（默认）'),
@@ -22,8 +22,6 @@ const headerMode = () => z.union([
 const customUserAgent = () => z.string().pattern(/^[\x21-\x7e][\x20-\x7e]*$/).default('custom-client/1.0')
 export const Config = z.object({
   enabled: z.boolean().default(true).description('启用模型请求控制与统一重试；覆盖所有模型请求报错，手动停止除外').volatile(),
-  headerMode: headerMode().description('旧版默认 User-Agent；未单独配置的渠道沿用此值').volatile(),
-  customUserAgent: customUserAgent().description('旧版默认自定义 User-Agent').volatile(),
   providerHeaders: z.dict(z.object({
     headerMode: headerMode().description('该渠道的 User-Agent 模式'),
     customUserAgent: customUserAgent().description('该渠道的自定义 User-Agent'),
@@ -42,7 +40,7 @@ export const Config = z.object({
 
 export function apply(ctx, config) {
   const settings = () => Object.fromEntries(Object.keys(Config.dict).map(key => [key, config[key].get()]))
-  const log = message => ctx.logger.info(`llm-compat: ${message}`)
+  const log = message => ctx.logger.info(`model-controls: ${message}`)
   const homePath = ctx.get('dshHomePath')
   const record = recoveryLog(typeof homePath === 'function' ? homePath() : homePath ?? join(homedir(), '.dsh'))
   const recovery = installRequestRecovery(ctx, {
@@ -54,8 +52,8 @@ export function apply(ctx, config) {
     config: () => providerRequestSettings(settings(), providers.current()),
   })
   ctx.on('dispose', () => { recovery.dispose(); adapter.dispose(); providers.dispose() })
-  const { continueMessage: _message, customUserAgent: _userAgent, providerHeaders: _providerHeaders, ...summary } = settings()
-  try { record({ time: new Date().toISOString(), event: 'plugin-loaded', version: '3.2.0', ...summary }) }
+  const { continueMessage: _message, providerHeaders: _providerHeaders, ...summary } = settings()
+  try { record({ time: new Date().toISOString(), event: 'plugin-loaded', version: '4.0.0', ...summary }) }
   catch (error) { log(`recovery log unavailable: ${error.code ?? error.name}`) }
-  ctx.logger.info('llm-compat v3.2.0: unified native request retries with visible progress and configurable continuation')
+  ctx.logger.info('model-controls v4.0.0: unified native request retries with visible progress and configurable continuation')
 }

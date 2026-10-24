@@ -28,7 +28,7 @@ try {
     await page.addScriptTag({ path: join(root, 'umd', name + '.development.js') })
   }
   await page.evaluate(() => {
-    let row = { ns: 'llm-compat', revision: 7, value: { enabled: true, headerMode: 'native', customUserAgent: 'ExampleClient/1.0', recoveryMode: 'retry', maxRetries: 60, retryDelaySeconds: 1, retryForever: false, maxAutoContinues: 3, continueDelaySeconds: 2, continueMessage: '请继续完成。', providerHeaders: {} } }
+    let row = { ns: 'model-controls', revision: 7, value: { enabled: true, recoveryMode: 'retry', maxRetries: 60, retryDelaySeconds: 1, retryForever: false, maxAutoContinues: 3, continueDelaySeconds: 2, continueMessage: '请继续完成。', providerHeaders: {} } }
     let nativeRow = { ns: 'llm-pi-ai', revision: 11, value: { providers: { primary: { displayName: '主渠道', streamIdleTimeoutMs: 300000 }, backup: { displayName: '备用渠道', streamIdleTimeoutMs: 120000 } } } }
     window.writes = []
     window.__ModuleLoader__ = { load({ factory }) {
@@ -52,21 +52,21 @@ try {
       })
     } }
   })
-  await page.addScriptTag({ content: readFileSync(new URL('../plugins/dsh-llm-compat/lib/client.js', import.meta.url), 'utf8') })
+  await page.addScriptTag({ content: readFileSync(new URL('../plugins/dsh-model-controls/lib/client.js', import.meta.url), 'utf8') })
   await control('额外重试次数').waitFor()
   const layout = () => page.evaluate(() => {
     const box = node => { const r = node.getBoundingClientRect(); return { x: r.x, y: r.y, right: r.right, bottom: r.bottom, width: r.width } }
-    const grid = document.querySelector('[aria-label="额外重试次数"]').closest('.dsh-llm-compat-grid')
+    const grid = document.querySelector('[aria-label="额外重试次数"]').closest('.dsh-model-controls-grid')
     const card = grid.parentElement
     const input = document.querySelector('[aria-label="额外重试次数"]')
-    const timeout = document.querySelector('.dsh-llm-compat-provider')
-    return { grid: box(grid), card: box(card), input: box(input), footer: box(document.querySelector('[aria-label="全局重试设置"] .dsh-llm-compat-footer')), timeout: { card: box(timeout), controls: [...timeout.querySelectorAll('input, select, button')].map(box) }, position: getComputedStyle(grid).position, pointerEvents: getComputedStyle(grid).pointerEvents, padding: getComputedStyle(card).paddingLeft, overflow: document.documentElement.scrollWidth > innerWidth }
+    const timeout = document.querySelector('.dsh-model-controls-provider')
+    return { grid: box(grid), card: box(card), input: box(input), footer: box(document.querySelector('[aria-label="全局重试设置"] .dsh-model-controls-footer')), timeout: { card: box(timeout), controls: [...timeout.querySelectorAll('input, select, button')].map(box) }, position: getComputedStyle(grid).position, pointerEvents: getComputedStyle(grid).pointerEvents, padding: getComputedStyle(card).paddingLeft, overflow: document.documentElement.scrollWidth > innerWidth }
   })
   // Prove the fixture reproduces the reported collision when the old name returns.
-  await control('额外重试次数').evaluate(input => input.closest('.dsh-llm-compat-grid').classList.add('lc-grid'))
+  await control('额外重试次数').evaluate(input => input.closest('.dsh-model-controls-grid').classList.add('lc-grid'))
   assert.equal((await layout()).position, 'absolute')
   assert.equal((await layout()).pointerEvents, 'none')
-  await control('额外重试次数').evaluate(input => input.closest('.dsh-llm-compat-grid').classList.remove('lc-grid'))
+  await control('额外重试次数').evaluate(input => input.closest('.dsh-model-controls-grid').classList.remove('lc-grid'))
   const measurements = []
   for (const width of [680, 480, 320]) {
     await page.setViewportSize({ width: width + 48, height: 1050 })
@@ -92,14 +92,14 @@ try {
   const descriptions = new Set()
   for (const mode of ['native', 'claude-code', 'codex', 'pi', 'custom']) {
     await control('User-Agent 模式').selectOption(mode)
-    descriptions.add(await page.locator('#llm-compat-headerMode-help').textContent())
+    descriptions.add(await page.locator('#model-controls-headerMode-help').textContent())
     assert.equal(await control('自定义 User-Agent').count(), mode === 'custom' ? 1 : 0)
   }
   assert.equal(descriptions.size, 5)
   await control('User-Agent 模式').selectOption('claude-code')
-  assert.match(await page.locator('#llm-compat-headerMode-help').textContent(), /不附加 Claude 专属字段/)
-  await control('User-Agent 模式').evaluate(node => node.closest('.dsh-llm-compat-card').scrollIntoView())
-  await page.locator('.dsh-llm-compat-card').filter({ has: control('User-Agent 模式') }).screenshot({ path: fileURLToPath(new URL('claude-user-agent.png', output)) })
+  assert.match(await page.locator('#model-controls-headerMode-help').textContent(), /不附加 Claude 专属字段/)
+  await control('User-Agent 模式').evaluate(node => node.closest('.dsh-model-controls-card').scrollIntoView())
+  await page.locator('.dsh-model-controls-card').filter({ has: control('User-Agent 模式') }).screenshot({ path: fileURLToPath(new URL('claude-user-agent.png', output)) })
   await control('User-Agent 模式').selectOption('native')
   await page.screenshot({ path: fileURLToPath(new URL('dark-default.png', output)), fullPage: true })
   await control('不限重试次数').check()
@@ -131,7 +131,7 @@ try {
   assert.equal(await control('User-Agent 模式').evaluate(node => node.matches(':open')), false)
   await control('恢复模式').click()
   await page.getByRole('option', { name: '重试耗尽后发送继续消息', exact: true }).click()
-  assert.match(await page.locator('#llm-compat-recoveryMode-help').textContent(), /发送可见的继续消息/)
+  assert.match(await page.locator('#model-controls-recoveryMode-help').textContent(), /发送可见的继续消息/)
   await control('继续消息内容').waitFor()
   await control('最多自动继续次数').fill('0')
   assert.equal(await control('发送继续消息前等待（秒）').isDisabled(), true)
@@ -141,7 +141,7 @@ try {
   assert.deepEqual(await page.evaluate(() => window.writes[0].patch), { recoveryMode: 'continue', maxAutoContinues: 0 })
   await page.getByRole('button', { name: '保存渠道配置', exact: true }).click()
   await page.getByRole('status').filter({ hasText: '渠道配置已保存；' }).waitFor()
-  assert.deepEqual(await page.evaluate(() => window.writes[1]), { ns: 'llm-compat', patch: { providerHeaders: { primary: { headerMode: 'claude-code', customUserAgent: 'ExampleClient/1.0' } } }, revision: 8 })
+  assert.deepEqual(await page.evaluate(() => window.writes[1]), { ns: 'model-controls', patch: { providerHeaders: { primary: { headerMode: 'claude-code', customUserAgent: 'custom-client/1.0' } } }, revision: 8 })
   assert.equal(await control('流空闲超时（秒）').inputValue(), '300')
   await control('模型渠道').selectOption('backup')
   assert.equal(await control('流空闲超时（秒）').inputValue(), '120')
@@ -168,7 +168,7 @@ try {
     dialog.innerHTML = '<nav>' + ['通用设置', '模型请求控制'].map(label => `<button type="button" style="display:flex;align-items:center;gap:8px;padding:9px 12px;width:100%;border:0;border-radius:8px;background:#fff;color:#26324a;font:14px/22px sans-serif"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor"/></svg><span>${label}</span></button>`).join('') + '</nav>'
     document.body.appendChild(dialog)
   })
-  const nav = page.locator('[data-dsh-llm-compat-nav]')
+  const nav = page.locator('[data-dsh-model-controls-nav]')
   await nav.waitFor()
   const navStyle = await nav.evaluate(node => ({ original: getComputedStyle(node.firstElementChild).display, mask: getComputedStyle(node, '::before').maskImage, color: getComputedStyle(node, '::before').backgroundColor }))
   assert.equal(navStyle.original, 'none')
@@ -179,7 +179,7 @@ try {
   assert.equal(await nav.evaluate(node => getComputedStyle(node, '::before').backgroundColor), 'rgb(65, 107, 219)')
   await page.locator('[data-shortcut-modal="settings"] nav').screenshot({ path: fileURLToPath(new URL('navigation-icon.png', output)) })
   await page.evaluate(() => window.disposeNavigationIcon())
-  assert.equal(await page.locator('[data-dsh-llm-compat-nav]').count(), 0)
+  assert.equal(await page.locator('[data-dsh-model-controls-nav]').count(), 0)
   assert.equal(await page.getByRole('button', { name: '模型请求控制', exact: true }).evaluate(node => getComputedStyle(node.firstElementChild).display === 'none'), false)
   assert.deepEqual(errors, [])
   const report = { browser: browser.version(), measurements, picker, navStyle, errors, checks: ['collision reproduced with old class', 'isolated layout at 680/480/320px including timeout card padding', 'master/unlimited/zero disabled states', 'native picker styles and keyboard selection/Escape', 'mouse option selection', 'User-Agent and recovery descriptions follow selection', 'React save patch', 'channel identity and timeout save independently from global recovery; selection preserves values', 'navigation icon on late mount, inherited color and cleanup'], limitation: 'Isolated React page with reproduced conflicting CSS and theme tokens; not a screenshot of the live Harness settings dialog.' }

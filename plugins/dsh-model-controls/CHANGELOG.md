@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.0.0 — review candidate
+
+- Use the package name `dsh-model-controls` and settings ID `model-controls`. Install as a new plugin and configure it manually.
+- Default unconfigured channels to native identity; remove global legacy User-Agent defaults.
+- Distribute a self-contained npm tarball suitable for GitHub Release downloads.
+- Keep provider definitions and native stream idle timeouts in Harness.
+
+
 ## 3.2.0 — review candidate
 
 - Group channel selection, User-Agent and stream idle timeout in the upper settings card.
@@ -21,4 +29,4 @@
 - Show contextual descriptions for the selected User-Agent and recovery modes.
 - Include documentation, configuration examples, reproducible tests and a review package workflow.
 
-The package and settings identifiers remain unchanged for existing local installations. This candidate has not been published.
+These candidates have not been published. Version 4 changes package and settings identifiers.

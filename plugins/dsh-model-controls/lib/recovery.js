@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto'
 import { setTimeout as delay } from 'node:timers/promises'
 
-const AUTO_RPC_PREFIX = 'llm-compat:auto-continue:'
-const POLICY_KEY = 'llm-compat:unified-v3'
+const AUTO_RPC_PREFIX = 'model-controls:auto-continue:'
+const POLICY_KEY = 'model-controls:unified-v3'
 const isAuto = message => message?.source?.kind === 'user' && message.source.rpcId?.startsWith(AUTO_RPC_PREFIX)
 
 /** One native request-recovery policy, including failures after HTTP 200. */

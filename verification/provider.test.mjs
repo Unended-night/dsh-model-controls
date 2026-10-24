@@ -2,9 +2,9 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { fileURLToPath } from 'node:url'
 import { importCurrent, runInCurrentRuntime } from './current-runtime.mjs'
-import { installProviderContext } from '../plugins/dsh-llm-compat/lib/provider-context.js'
-import { installCompatibleFetch } from '../plugins/dsh-llm-compat/lib/transport.js'
-import { providerRequestSettings, USER_AGENTS } from '../plugins/dsh-llm-compat/lib/user-agent.js'
+import { installProviderContext } from '../plugins/dsh-model-controls/lib/provider-context.js'
+import { installCompatibleFetch } from '../plugins/dsh-model-controls/lib/transport.js'
+import { providerRequestSettings, USER_AGENTS } from '../plugins/dsh-model-controls/lib/user-agent.js'
 import { collect, fixtureResponse, openAiFixture, responsesFixture, anthropicFixture } from './harness.mjs'
 
 if (process.argv.includes('--host')) runInCurrentRuntime(fileURLToPath(import.meta.url), ['--host'])
@@ -12,11 +12,11 @@ const { Context } = await importCurrent('@deepseek-ai/cordis')
 const { default: Llm } = await importCurrent('@deepseek-ai/dsh-llm')
 const pi = await importCurrent('@deepseek-ai/dsh-llm-pi-ai')
 
-test('provider settings preserve legacy defaults but isolate explicit native and unknown routes', () => {
+test('provider settings isolate channel identities and default unconfigured routes to native', () => {
   const settings = { headerMode: 'codex', providerHeaders: { primary: { headerMode: 'native' }, backup: { headerMode: 'custom', customUserAgent: 'Backup/1' } } }
   assert.equal(providerRequestSettings(settings, 'primary').headerMode, 'native')
   assert.equal(providerRequestSettings(settings, 'backup').customUserAgent, 'Backup/1')
-  assert.equal(providerRequestSettings(settings, 'unconfigured').headerMode, 'codex')
+  assert.equal(providerRequestSettings(settings, 'unconfigured').headerMode, 'native')
   assert.equal(providerRequestSettings(settings, undefined).headerMode, 'native')
   assert.equal(providerRequestSettings(settings, '').headerMode, 'native')
 })
@@ -86,10 +86,10 @@ test('lazy iteration and early cleanup run in the route while the consumer remai
 
 if (process.versions.electron) test('native settings merge one channel identity without replacing other channels or global recovery', async () => {
   const { SettingsForms } = await importCurrent('@deepseek-ai/dsh-settings')
-  const plugin = await import('../plugins/dsh-llm-compat/lib/index.js')
-  let raw = { maxRetries: 60, headerMode: 'codex', providerHeaders: { backup: { headerMode: 'custom', customUserAgent: 'Backup/1' } } }
+  const plugin = await import('../plugins/dsh-model-controls/lib/index.js')
+  let raw = { maxRetries: 60, providerHeaders: { backup: { headerMode: 'custom', customUserAgent: 'Backup/1' } } }
   const config = plugin.Config(raw)
-  const entry = { id: 'fixture-entry', options: { id: 'llm-compat', config: raw }, fiber: { uid: 'fixture-fiber', state: 2, runtime: plugin, config, ctx: new Context() } }
+  const entry = { id: 'fixture-entry', options: { id: 'model-controls', config: raw }, fiber: { uid: 'fixture-fiber', state: 2, runtime: plugin, config, ctx: new Context() } }
   const forms = Object.assign(Object.create(SettingsForms.prototype), {
     revisions: new Map(), presentations: new Map(),
     ownerContext: { emit() {}, configEditor: {
@@ -105,12 +105,12 @@ if (process.versions.electron) test('native settings merge one channel identity 
   })
   const initial = forms.describe({ redactSecrets: true })[0]
   assert.equal(initial.applies, 'live')
-  await forms.update('llm-compat', { providerHeaders: { primary: { headerMode: 'claude-code', customUserAgent: 'Primary/1' } } }, initial.revision)
+  await forms.update('model-controls', { providerHeaders: { primary: { headerMode: 'claude-code', customUserAgent: 'Primary/1' } } }, initial.revision)
   assert.deepEqual(raw.providerHeaders.backup, { headerMode: 'custom', customUserAgent: 'Backup/1' })
   assert.equal(raw.maxRetries, 60)
-  assert.equal(raw.headerMode, 'codex')
+  assert.equal(raw.headerMode, undefined)
   assert.equal(config.providerHeaders.get().primary.headerMode, 'claude-code')
   assert.equal(forms.describe({ redactSecrets: true })[0].value.providerHeaders.primary.customUserAgent, 'Primary/1')
-  await assert.rejects(forms.update('llm-compat', { providerHeaders: { primary: { headerMode: 'native' } } }, initial.revision), error => error.code === 'SETTINGS_CONFLICT')
+  await assert.rejects(forms.update('model-controls', { providerHeaders: { primary: { headerMode: 'native' } } }, initial.revision), error => error.code === 'SETTINGS_CONFLICT')
   assert.equal(config.providerHeaders.get().primary.headerMode, 'claude-code')
 })

@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { createCompatibleFetch, filterNullSse, installCompatibleFetch } from '../plugins/dsh-llm-compat/lib/transport.js'
-import { USER_AGENTS } from '../plugins/dsh-llm-compat/lib/user-agent.js'
+import { createCompatibleFetch, filterNullSse, installCompatibleFetch } from '../plugins/dsh-model-controls/lib/transport.js'
+import { USER_AGENTS } from '../plugins/dsh-model-controls/lib/user-agent.js'
 
 const headers = { 'user-agent': 'deepseek-harness/0.2.1', 'x-api-key': 'fixture-key', 'anthropic-beta': 'native-feature', 'x-stainless-timeout': '45' }
 const request = { method: 'POST', headers, body: '{}' }

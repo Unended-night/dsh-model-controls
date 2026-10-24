@@ -14,9 +14,9 @@ export const USER_AGENTS = Object.freeze({
 })
 
 export function providerRequestSettings(settings, provider) {
-  // Legacy defaults remain for existing routes until explicitly configured.
+  // Each channel opts in independently; unconfigured channels keep native identity.
   // Draft discovery without a route must not inherit another route's identity.
-  return { ...settings, ...(!provider ? { headerMode: 'native' } : settings.providerHeaders?.[provider]) }
+  return { ...settings, headerMode: 'native', customUserAgent: 'custom-client/1.0', ...(provider ? settings.providerHeaders?.[provider] : undefined) }
 }
 
 export function selectedUserAgent(settings) {

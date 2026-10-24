@@ -7,7 +7,7 @@ import { pathToFileURL } from 'node:url'
 export async function importRuntime(specifier) {
   const resources = process.resourcesPath ?? join(dirname(process.execPath), 'resources')
   const roots = [
-    process.env.DSH_LLM_COMPAT_RUNTIME,
+    process.env.DSH_MODEL_CONTROLS_RUNTIME,
     join(resources, 'app.asar', 'dsh'),
     join(resources, 'app.asar.unpacked', 'dsh'),
   ].filter(Boolean)
@@ -19,5 +19,5 @@ export async function importRuntime(specifier) {
     } catch (error) { failures.push(error.code ?? error.name) }
   }
   try { return await import(specifier) } catch {}
-  throw new Error(`llm-compat: cannot resolve ${specifier} from the Harness runtime (${failures.join(', ')})`)
+  throw new Error(`model-controls: cannot resolve ${specifier} from the Harness runtime (${failures.join(', ')})`)
 }

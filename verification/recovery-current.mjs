@@ -2,10 +2,10 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { runInCurrentRuntime, importCurrent, currentRequire } from './current-runtime.mjs'
-import { installRequestRecovery } from '../plugins/dsh-llm-compat/lib/recovery.js'
-import { createCompatibleFetch } from '../plugins/dsh-llm-compat/lib/transport.js'
-import { installProviderContext } from '../plugins/dsh-llm-compat/lib/provider-context.js'
-import { USER_AGENTS, providerRequestSettings } from '../plugins/dsh-llm-compat/lib/user-agent.js'
+import { installRequestRecovery } from '../plugins/dsh-model-controls/lib/recovery.js'
+import { createCompatibleFetch } from '../plugins/dsh-model-controls/lib/transport.js'
+import { installProviderContext } from '../plugins/dsh-model-controls/lib/provider-context.js'
+import { USER_AGENTS, providerRequestSettings } from '../plugins/dsh-model-controls/lib/user-agent.js'
 import { fixtureResponse, openAiFixture, responsesFixture, anthropicFixture } from './harness.mjs'
 
 runInCurrentRuntime(fileURLToPath(import.meta.url), process.argv.slice(2))
@@ -98,7 +98,7 @@ for (const scenario of scenarios) {
     assert.equal(requests.length, scenario.requests, scenario.name)
     assert.equal(retries.length, scenario.retries, scenario.name)
     assert.equal(started.length, scenario.retries, scenario.name)
-    assert.ok(retries.every(e => e.data.policyKey === 'llm-compat:unified-v3' && e.data.delayMs === 1250))
+    assert.ok(retries.every(e => e.data.policyKey === 'model-controls:unified-v3' && e.data.delayMs === 1250))
     assert.ok(retries.every(e => scenario.forever ? e.data.mode === 'always' : e.data.mode === 'normal' && e.data.maxRetries === scenario.maximum))
     assert.equal(delays.filter(d => d === 1250).length, scenario.retries)
     assert.equal(delays.filter(d => d === 3500).length, scenario.messages - 1)

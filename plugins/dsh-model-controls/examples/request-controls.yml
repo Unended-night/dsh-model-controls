@@ -1,6 +1,6 @@
 # Override the entry already registered by the plugin bundle.
 # Merge this section into the existing profile; do not register a second instance.
-- id: llm-compat
+- id: model-controls
   config:
     enabled: true
     providerHeaders:

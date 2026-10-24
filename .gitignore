@@ -16,6 +16,7 @@ verification/*
 !verification/schema.test.mjs
 !verification/harness.mjs
 !verification/current-runtime.mjs
+!verification/install-current.mjs
 !verification/recovery-current.mjs
 !verification/timeout-current.mjs
 !verification/settings-layout.mjs

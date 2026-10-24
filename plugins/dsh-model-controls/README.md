@@ -1,6 +1,8 @@
 # 模型请求控制 · Model Request Controls
 
-DeepSeek Harness 的“模型请求控制”插件，当前版本 **3.2.0**。测试目标为 Harness 0.2.1-rc.2 / Node 22.19+。当前是未发布的审核候选；内部包名和配置 ID 保留，继续使用现有本机安装。
+DeepSeek Harness 的“模型请求控制”插件，当前版本 **4.0.0**。测试目标为 Harness 0.2.1-rc.2 / Node 22.19+。当前是未发布的审核候选；包名为 `dsh-model-controls`，配置 ID 为 `model-controls`。
+
+安装时在 Harness 的插件管理页填写本地 `.tgz` 文件的完整路径；正式发布后也可填写 GitHub Release 中该文件的下载链接。首次安装完成后重启 Harness。旧开发版应先停用或移除，避免同时启用两套请求控制。4.0 需要重新配置插件，模型渠道和原生超时仍由 Harness 保管。源码仓库的自动 ZIP 不是插件安装包。
 
 在 **设置 → 模型请求控制** 中选择 User-Agent、重试方式、次数和等待间隔。配置通过 Harness 原生 settings 接口保存到当前 profile；后续请求读取新配置，重启后继续应用。首次安装或修改插件源码后需要重启加载。
 
@@ -36,7 +38,7 @@ DeepSeek Harness 的“模型请求控制”插件，当前版本 **3.2.0**。�
 
 User-Agent 按 Harness 的渠道 ID 保存，适用于该渠道的模型调用和带有渠道 ID 的模型列表请求。多个渠道即使使用相同地址，也各用自己的身份；不从域名、地址或模型名猜测渠道。尚未指定渠道的新建模型发现请求保留原生身份。
 
-升级前的全局 `headerMode` 和 `customUserAgent` 保留为未单独配置渠道的默认值，避免升级后改变已有请求。新安装默认为原生；在卡片中修改并保存某个渠道后，该渠道使用自己的配置，不影响其他渠道。
+每个渠道独立配置。未配置的渠道使用原生 User-Agent；保存某个渠道只影响该渠道。4.0 更换了包名和设置 ID，作为新插件安装，不导入旧插件设置；已有模型渠道及其原生流空闲超时不变。
 
 | 模式 | 行为 |
 | --- | --- |
@@ -82,8 +84,6 @@ Claude Code 预设为 claude-cli/2.1.296 (external, sdk-cli)，Codex 为 codex_c
 | --- | --- | --- |
 | enabled | true | 启用请求控制与统一恢复策略 |
 | providerHeaders | {} | 按渠道 ID 保存 headerMode 和 customUserAgent |
-| headerMode | native | 旧版默认身份，未单独配置的渠道沿用 |
-| customUserAgent | custom-client/1.0 | 旧版默认自定义 UA |
 | recoveryMode | retry | retry 或 continue |
 | maxRetries | 5 | 额外重试次数；0 表示不重试 |
 | retryDelaySeconds | 2 | 固定重试间隔，0.1～86400 秒 |
@@ -92,14 +92,14 @@ Claude Code 预设为 claude-cli/2.1.296 (external, sdk-cli)，Codex 为 codex_c
 | continueDelaySeconds | 2 | 发送继续消息前等待，0～86400 秒 |
 | continueMessage | 请继续完成。 | 自动消息的自定义正文 |
 
-次数接受非负安全整数。保存仅提交编辑字段，并带上读取到的 revision；发生配置冲突时保留当前草稿并提示重新读取。旧版 `autoContinue` 开关由 `recoveryMode` 取代。
+次数接受非负安全整数。保存仅提交编辑字段，并带上读取到的 revision；发生配置冲突时保留当前草稿并提示重新读取。使用 `recoveryMode` 选择连续重试或自动继续。
 
 设置页上方是“渠道请求配置”：一个渠道选择器，共同管理该渠道的 User-Agent 与流空闲超时。下方是全局开关、失败处理和自动继续。两个区域分别通过“保存渠道配置”与“保存全局配置”保存，使用宿主主题颜色。选项会即时联动，保存后应用：关闭总开关时禁用请求身份和恢复配置，但仍可重新开启和保存；原生流空闲超时可继续编辑。开启不限重试次数时禁用次数上限；重试次数为 0 时禁用重试间隔；自动继续次数为 0 时禁用发送间隔和消息内容。被禁用的数值保留，切回后可继续编辑。无限重试只在连续重试模式生效，不影响继续消息模式的有限次数。
 
 需要写 YAML 时，只覆盖 bundle 已注册的条目，不另行 insert：
 
 ```yaml
-- id: llm-compat
+- id: model-controls
   config:
     recoveryMode: retry
     maxRetries: 60
@@ -109,7 +109,7 @@ Claude Code 预设为 claude-cli/2.1.296 (external, sdk-cli)，Codex 为 codex_c
         headerMode: native
 ```
 
-模型地址和 API Key 在 Harness 的模型设置中管理，不放进插件代码。恢复摘要记录到 Harness home 的 `logs/llm-compat/YYYY-MM-DD.jsonl`，每个 UTC 日文件最多约 5MB；不记录继续消息正文或自定义 UA。
+模型地址和 API Key 在 Harness 的模型设置中管理，不放进插件代码。恢复摘要记录到 Harness home 的 `logs/model-controls/YYYY-MM-DD.jsonl`，每个 UTC 日文件最多约 5MB；不记录继续消息正文或自定义 UA。
 
 ## 保存时机与限制
 
@@ -129,7 +129,7 @@ Claude Code 预设为 claude-cli/2.1.296 (external, sdk-cli)，Codex 为 codex_c
 
 源码仓库根目录执行 npm ci --ignore-scripts、npm test；安装 Playwright Chromium 后执行 npm run test:ui。测试使用公开依赖和合成数据，覆盖原生认证保留、五种身份、统一预算、取消、自动继续、工具序列化与三种协议回放。另有已安装宿主的隔离集成测试。
 
-这些检查不等于真实上游验收，也不保证所有第三方插件组合。当前自定义设置页为中文，英文仅用于元数据。公开安装、跨平台升级和卸载将在发布审核后验证；本次不改变现有本机安装。
+这些检查不等于真实上游验收，也不保证所有第三方插件组合。当前自定义设置页为中文，英文仅用于元数据。安装通过 Harness 插件管理器完成，可使用本地 `.tgz` 路径或正式发布后的 GitHub Release 资源链接。当前尚无公开下载地址；首次安装或更新后重启 Harness，平时保存配置无需重启。跨平台安装尚待验证。
 
 配置示例见 [请求控制](examples/request-controls.yml) 与 [流空闲超时](examples/stream-timeout.yml)。它们是已有条目的覆盖片段，不是完整 profile；不要重复注册插件或覆盖原有凭据。
 
@@ -148,6 +148,6 @@ Claude Code 预设为 claude-cli/2.1.296 (external, sdk-cli)，Codex 为 codex_c
 | lib/runtime.js | 从运行中的 Harness 解析官方库 |
 | cordis.patch.yml、locale/ | bundle 注册及插件说明 |
 
-插件没有构建步骤，不修改 Harness 应用归档。测试可用 `DSH_LLM_COMPAT_RUNTIME` 指定官方依赖根目录。
+插件没有构建步骤，不修改 Harness 应用归档。测试可用 `DSH_MODEL_CONTROLS_RUNTIME` 指定官方依赖根目录。
 
 源码采用 [MIT 许可证](LICENSE)，依赖保留各自许可证。不发送遥测；本地摘要包含会话标识、次数、间隔和错误类别，不记录 API Key、模型请求正文、自定义 User-Agent 或继续消息正文。

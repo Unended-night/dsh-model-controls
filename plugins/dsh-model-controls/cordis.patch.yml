@@ -1,0 +1,5 @@
+- insert:
+    - id: model-controls
+      name: dsh-model-controls
+      config:
+        enabled: true

@@ -1,5 +1,0 @@
-- insert:
-    - id: llm-compat
-      name: dsh-llm-compat
-      config:
-        enabled: true

@@ -10,11 +10,11 @@ const { Context } = await importCurrent('@deepseek-ai/cordis')
 
 // Cordis enforces service declarations and React DOM validates the full element tree.
 // Hook state and RPC responses are simulated so save/error paths remain deterministic.
-function harness({ reject = false, writable = true, providers = { primary: {}, backup: {} }, legacy = {} } = {}) {
+function harness({ reject = false, writable = true, providers = { primary: {}, backup: {} }, providerHeaders = {} } = {}) {
   const values = [], effects = [], writes = []
   let cursor = 0, component, module, mounted = false, tree
-  const initial = { enabled: true, headerMode: 'native', customUserAgent: 'custom-client/1.0', recoveryMode: 'retry', maxRetries: 5, retryDelaySeconds: 2, retryForever: false, maxAutoContinues: 3, continueDelaySeconds: 2, continueMessage: '请继续完成。', providerHeaders: {}, ...legacy }
-  let row = { ns: 'llm-compat', value: initial, revision: 7 }
+  const initial = { enabled: true, recoveryMode: 'retry', maxRetries: 5, retryDelaySeconds: 2, retryForever: false, maxAutoContinues: 3, continueDelaySeconds: 2, continueMessage: '请继续完成。', providerHeaders }
+  let row = { ns: 'model-controls', value: initial, revision: 7 }
   let nativeRow = providers && { ns: 'llm-pi-ai', value: { providers }, revision: 11 }
   const React = {
     createElement(type, props, ...children) { return typeof type === 'function' ? type(props) : { type, props: props ?? {}, children: children.flat(Infinity).filter(x => x != null && x !== false) } },
@@ -49,7 +49,7 @@ function harness({ reject = false, writable = true, providers = { primary: {}, b
       scope.reflect.provide('remote.settings', services.remote.settings)
     },
   })
-  vm.runInNewContext(readFileSync(new URL('../plugins/dsh-llm-compat/lib/client.js', import.meta.url), 'utf8'), {
+  vm.runInNewContext(readFileSync(new URL('../plugins/dsh-model-controls/lib/client.js', import.meta.url), 'utf8'), {
     // Browser layout/navigation is exercised separately in settings-layout.mjs.
     document: { createElement: () => ({ remove() {} }), head: { appendChild() {} }, body: {}, querySelectorAll: () => [] },
     MutationObserver: class { observe() {} disconnect() {} },
@@ -79,7 +79,7 @@ test('settings page saves only edited fields with the loaded revision; custom UA
   f.change('User-Agent 模式', 'custom'); f.change('自定义 User-Agent', 'ExampleClient/1.0')
   f.change('恢复模式', 'continue'); f.change('继续消息内容', '继续测试')
   f.change('额外重试次数', '60'); await f.saveChannel(); await f.save()
-  assert.deepEqual(JSON.parse(JSON.stringify(f.writes)), [{ ns: 'llm-compat', patch: { providerHeaders: { primary: { headerMode: 'custom', customUserAgent: 'ExampleClient/1.0' } } }, revision: 7 }, { ns: 'llm-compat', patch: { recoveryMode: 'continue', maxRetries: 60, continueMessage: '继续测试' }, revision: 8 }])
+  assert.deepEqual(JSON.parse(JSON.stringify(f.writes)), [{ ns: 'model-controls', patch: { providerHeaders: { primary: { headerMode: 'custom', customUserAgent: 'ExampleClient/1.0' } } }, revision: 7 }, { ns: 'model-controls', patch: { recoveryMode: 'continue', maxRetries: 60, continueMessage: '继续测试' }, revision: 8 }])
   assert.ok(f.nodes().some(n => n.props.role === 'status' && n.children.join('').startsWith('已保存')))
   assert.equal(f.nodes().find(n => n.type === 'button').props.disabled, true)
 })
@@ -93,14 +93,14 @@ test('settings conflict retains unsaved changes and reports failure', async t =>
 
 test('mode descriptions follow the selected User-Agent and recovery modes before saving', async t => {
   const f = harness(); t.after(() => f.dispose()); await f.load()
-  const help = key => f.nodes().find(n => n.props.id === `llm-compat-${key}-help`).children.join('')
+  const help = key => f.nodes().find(n => n.props.id === `model-controls-${key}-help`).children.join('')
   const descriptions = new Set()
   for (const [mode, expected] of [['native', /保留 Harness \/ SDK/], ['claude-code', /Claude Code.*不附加 Claude 专属字段/], ['codex', /Codex CLI/], ['pi', /pi.*操作系统和架构/], ['custom', /下方填写/]]) {
     f.change('User-Agent 模式', mode)
     assert.match(help('headerMode'), expected)
     descriptions.add(help('headerMode'))
     assert.equal(Boolean(f.control('自定义 User-Agent')), mode === 'custom')
-    assert.equal(f.control('User-Agent 模式').props['aria-describedby'], 'llm-compat-headerMode-help')
+    assert.equal(f.control('User-Agent 模式').props['aria-describedby'], 'model-controls-headerMode-help')
   }
   assert.equal(descriptions.size, 5)
   assert.match(help('recoveryMode'), /次数耗尽后结束/)
@@ -216,23 +216,23 @@ test('native timeout fields remain read-only when the profile cannot be edited',
   assert.equal(f.writes.length, 0)
 })
 
-test('channel drafts and saved identities remain isolated, including legacy defaults', async t => {
-  const f = harness({ legacy: { headerMode: 'codex' } }); t.after(() => f.dispose()); await f.load()
+test('channel drafts and saved identities remain isolated, with native defaults', async t => {
+  const f = harness({ providerHeaders: { primary: { headerMode: 'codex' } } }); t.after(() => f.dispose()); await f.load()
   assert.equal(f.control('User-Agent 模式').props.value, 'codex')
   f.change('User-Agent 模式', 'custom'); f.change('自定义 User-Agent', 'Primary/1.0')
   f.change('流空闲超时（秒）', '600')
   f.change('模型渠道', 'backup')
-  assert.equal(f.control('User-Agent 模式').props.value, 'codex')
+  assert.equal(f.control('User-Agent 模式').props.value, 'native')
   assert.equal(f.control('流空闲超时（秒）').props.value, 300)
-  f.change('User-Agent 模式', 'native'); await f.saveChannel()
-  assert.deepEqual(JSON.parse(JSON.stringify(f.writes[0].patch)), { providerHeaders: { backup: { headerMode: 'native', customUserAgent: 'custom-client/1.0' } } })
+  f.change('User-Agent 模式', 'pi'); await f.saveChannel()
+  assert.deepEqual(JSON.parse(JSON.stringify(f.writes[0].patch)), { providerHeaders: { backup: { headerMode: 'pi', customUserAgent: 'custom-client/1.0' } } })
   f.change('模型渠道', 'primary')
   assert.equal(f.control('自定义 User-Agent').props.value, 'Primary/1.0')
   assert.equal(f.control('流空闲超时（秒）').props.value, '600')
   await f.saveChannel()
-  assert.deepEqual(f.writes.map(w => [w.ns, w.revision]), [['llm-compat', 7], ['llm-compat', 8], ['llm-pi-ai', 11]])
+  assert.deepEqual(f.writes.map(w => [w.ns, w.revision]), [['model-controls', 7], ['model-controls', 8], ['llm-pi-ai', 11]])
   f.change('模型渠道', 'backup')
-  assert.equal(f.control('User-Agent 模式').props.value, 'native')
+  assert.equal(f.control('User-Agent 模式').props.value, 'pi')
   assert.equal(f.control('流空闲超时（秒）').props.value, 300)
   f.change('模型渠道', 'primary')
   assert.equal(f.control('User-Agent 模式').props.value, 'custom')
@@ -246,7 +246,7 @@ test('partial channel save reports the saved identity and retries only the faile
   assert.ok(f.nodes().some(n => n.props.role === 'status' && /User-Agent 已保存，流空闲超时保存失败/.test(n.children.join(''))))
   assert.equal(f.control('流空闲超时（秒）').props.value, '600')
   await f.saveChannel()
-  assert.deepEqual(f.writes.map(w => w.ns), ['llm-compat', 'llm-pi-ai', 'llm-pi-ai'])
+  assert.deepEqual(f.writes.map(w => w.ns), ['model-controls', 'llm-pi-ai', 'llm-pi-ai'])
   assert.equal(f.control('User-Agent 模式').props.value, 'claude-code')
   assert.equal(f.control('流空闲超时（秒）').props.value, 600)
 })

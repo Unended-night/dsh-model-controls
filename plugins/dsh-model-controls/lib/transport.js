@@ -18,7 +18,7 @@ export function filterNullSse(response, onDrop = () => {}) {
   const decoder = new TextDecoder(), encoder = new TextEncoder()
   let pending = ''
   const emit = (event, separator, controller) => {
-    if (event.length > 4 * 1024 * 1024) throw new Error('llm-compat: oversized SSE event')
+    if (event.length > 4 * 1024 * 1024) throw new Error('model-controls: oversized SSE event')
     if (nullEvent(event)) { onDrop(); controller.enqueue(encoder.encode(`: gateway heartbeat${separator || '\n\n'}`)) }
     else controller.enqueue(encoder.encode(event + separator))
   }
@@ -31,7 +31,7 @@ export function filterNullSse(response, onDrop = () => {}) {
         emit(pending.slice(0, boundary.index), boundary[0], controller)
         pending = pending.slice(boundary.index + boundary[0].length)
       }
-      if (pending.length > 4 * 1024 * 1024) throw new Error('llm-compat: oversized SSE event')
+      if (pending.length > 4 * 1024 * 1024) throw new Error('model-controls: oversized SSE event')
     },
     flush(controller) {
       pending += decoder.decode()

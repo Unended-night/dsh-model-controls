@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { createCompatibleFetch } from '../plugins/dsh-llm-compat/lib/transport.js'
-import { USER_AGENTS, selectedUserAgent } from '../plugins/dsh-llm-compat/lib/user-agent.js'
+import { createCompatibleFetch } from '../plugins/dsh-model-controls/lib/transport.js'
+import { USER_AGENTS, selectedUserAgent } from '../plugins/dsh-model-controls/lib/user-agent.js'
 
 for (const headerMode of ['native', 'claude-code', 'codex', 'pi', 'custom']) test(`${headerMode}: explicit headers and auth survive HTTP failure retries`, async () => {
   const settings = { headerMode, customUserAgent: 'ExampleClient/3.0 (desktop)', maxRetries: 2 }

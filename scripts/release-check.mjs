@@ -5,14 +5,14 @@ import { fileURLToPath } from 'node:url'
 
 const root = fileURLToPath(new URL('../', import.meta.url))
 const files = execFileSync('git', ['ls-files', '-z'], { cwd: root, encoding: 'utf8' }).split('\0').filter(Boolean)
-const packageRoot = 'plugins/dsh-llm-compat/'
+const packageRoot = 'plugins/dsh-model-controls/'
 const pkg = JSON.parse(readFileSync(new URL('../' + packageRoot + 'package.json', import.meta.url), 'utf8'))
 assert.equal(pkg.private, true, 'candidate must remain unpublished until review')
 assert.equal(pkg.license, 'MIT')
-assert.equal(pkg.name, 'dsh-llm-compat', 'preserve the current installation identifier')
+assert.equal(pkg.name, 'dsh-model-controls', 'use the public installation identifier')
 const allowed = ['lib', 'locale', 'cordis.patch.yml', 'README.md', 'LICENSE', 'CHANGELOG.md', 'examples']
 assert.deepEqual([...pkg.files].sort(), [...allowed].sort())
-for (const required of ['README.md', 'LICENSE', 'CONTRIBUTING.md', 'SECURITY.md', 'package-lock.json', 'docs/RELEASE-REVIEW.md', packageRoot + 'README.md', packageRoot + 'LICENSE']) assert.ok(files.includes(required), 'missing staged file: ' + required)
+for (const required of ['README.md', 'LICENSE', 'CONTRIBUTING.md', 'SECURITY.md', 'package-lock.json', 'docs/RELEASE-REVIEW.md', 'docs/INSTALLATION.md', packageRoot + 'README.md', packageRoot + 'LICENSE']) assert.ok(files.includes(required), 'missing staged file: ' + required)
 const forbidden = []
 for (let i = 2; i < process.argv.length; i += 2) {
   assert.equal(process.argv[i], '--forbid')

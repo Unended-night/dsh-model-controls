@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { normalizeToolSchemas } from '../plugins/dsh-llm-compat/lib/schema.js'
-import { createCompatibleFetch } from '../plugins/dsh-llm-compat/lib/transport.js'
+import { normalizeToolSchemas } from '../plugins/dsh-model-controls/lib/schema.js'
+import { createCompatibleFetch } from '../plugins/dsh-model-controls/lib/transport.js'
 
 test('normalization retains optionality, nested constraints and values that resemble schemas', () => {
   const example = { type: 'object', properties: { label: { type: 'string' } } }
