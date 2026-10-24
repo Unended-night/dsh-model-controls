@@ -1,52 +1,48 @@
 # 安装、更新与卸载
 
-插件包名为 `dsh-model-controls`，设置页名称为“模型请求控制”，配置 ID 为 `model-controls`。源码位于 [GitHub 仓库](https://github.com/Unended-night/dsh-model-controls)，安装包位于 [Releases](https://github.com/Unended-night/dsh-model-controls/releases)。
+## 安装插件
 
-## 安装包
+1. 打开 DeepSeek Harness 的**插件管理**页面，进入安装入口。
+2. 粘贴下面的下载链接，安装并启用“模型请求控制”。
+3. 重启 Harness，打开 **设置 → 模型请求控制**。
 
-下载 [dsh-model-controls-4.0.0.tgz](https://github.com/Unended-night/dsh-model-controls/releases/download/v4.0.0/dsh-model-controls-4.0.0.tgz)，或复制其下载链接。开发者也可使用 `npm run pack:review` 生成本地 `.tgz`。包内包含运行源码，无需构建或执行安装脚本。
+```text
+https://github.com/Unended-night/dsh-model-controls/releases/download/v4.0.0/dsh-model-controls-4.0.0.tgz
+```
 
-不要把 GitHub 自动生成的 Source code ZIP 当作安装包：仓库根目录是测试工作区，实际插件位于 `plugins/dsh-model-controls/`。也不要直接把这个仓库的 Git 地址作为插件安装源。
+也可以在 [Releases](https://github.com/Unended-night/dsh-model-controls/releases) 下载 `dsh-model-controls-4.0.0.tgz`，再用文件的完整路径安装。请选择 `.tgz` 插件包；Source code ZIP 是源码。
 
-## 在 Harness 中安装
+首次安装或更新后需要重启一次，平时保存配置无需重启。插件直接使用 Harness 中已有的模型渠道，无需在插件内重新填写 API Key。
 
-1. 打开侧边栏的插件管理页，进入安装入口。
-2. 输入 `.tgz` 的完整本地路径，或正式 Release 中该资源的 HTTPS 下载链接。
-3. 安装并启用“模型请求控制”，完成后重启 Harness。
-4. 在“设置 → 模型请求控制”里选择渠道，配置 User-Agent 与流空闲超时；按需配置全局重试与自动继续。
+目前已在 Windows 的 Harness **0.2.1-rc.2** 上验证。其他系统的实际 Harness 安装尚未验证。
 
-普通设置保存后无需重启。新安装、更新插件文件后重启一次。安装到 profile 的包不再链接开发源码，编辑源码不会改变已经安装的版本。
+## 更新
 
-## 命令行方式
+1. 保存已经修改的设置。
+2. 在插件管理页移除当前插件。
+3. 使用新版本 Release 中的 `.tgz` 安装包重新安装，按宿主提示重启。
+4. 打开插件设置，检查渠道和恢复参数。
 
-确认当前安装提供 `dsh` 命令。Windows Desktop 使用应用随附的 `resources/runtime/cli/bin/dsh.cmd`；不要误用另一套 Harness 的 CLI。先完全退出 Harness，再运行：
+已验证同版本重装时保留配置。跨版本升级请先阅读对应版本的发布说明，并记录重要设置。
+
+## 卸载
+
+在 Harness 插件管理页移除“模型请求控制”，按提示重启。
+
+卸载不会主动清除各渠道的流空闲超时。需要恢复默认值时，在卸载前把相应渠道设为 **300 秒**并保存。
+
+## 命令行安装
+
+如果你已配置 Harness 的 `dsh` 命令，也可通过命令行安装。操作前完全退出 Harness。
 
 ```sh
 dsh plugin --profile desktop add "https://github.com/Unended-night/dsh-model-controls/releases/download/v4.0.0/dsh-model-controls-4.0.0.tgz" --ignore-scripts
 ```
 
-也可把下载链接替换为本地安装包的完整路径。宿主命令会调用随附 pnpm、检查版本要求，并自动注册包的 bundle。包的 `private: true` 阻止误发 npm，不阻止安装 `.tgz`，发布到 GitHub Releases 时可以保留。
-
-## 从旧开发版切换
-
-先移除旧插件，再安装新包，避免两个插件同时包装请求。4.0 使用新包名和设置 ID，不自动读取旧插件的设置；重新配置即可。仅删除旧插件自己的配置条目，不删除其他插件、模型渠道或认证信息。原生 `llm-pi-ai` 中的超时继续保留。
-
-## 更新与卸载
-
-更新前保存已修改的设置，退出 Harness，先移除当前包，再安装新版本的 `.tgz`，然后重新启动。也可以在宿主插件管理页执行移除、安装，并按提示重启。使用明确的版本链接，不依赖 `latest` 自动变动。跨版本升级尚未验证。
+卸载命令：
 
 ```sh
 dsh plugin --profile desktop remove dsh-model-controls
 ```
 
-卸载插件不会主动清除原生渠道的流空闲超时；如需恢复默认，在卸载前把相应渠道设置为 `300` 秒。宿主可能保留插件配置覆盖项，是否需要清理以当前宿主提示为准；不要删除整个 profile。
-
-## 验证范围
-
-发布包的安装验证脚本使用隔离的合成 profile，并调用已安装宿主的包管理、bundle 合成和配置 schema；不访问真实模型或读取日常 profile。它覆盖本地路径安装、HTTP 包下载、同版本重装、配置保留和卸载。该自动测试不代表实际 GitHub 下载验收；跨版本升级、其他操作系统和插件市场上架仍需后续验收。
-
-```sh
-npm run pack:review
-# 先设置 DSH_TEST_EXECUTABLE 为已安装的 Harness 可执行文件
-node verification/install-current.mjs dist/dsh-model-controls-4.0.0.tgz
-```
+[使用说明](../plugins/dsh-model-controls/README.md) · [问题反馈](https://github.com/Unended-night/dsh-model-controls/issues)
