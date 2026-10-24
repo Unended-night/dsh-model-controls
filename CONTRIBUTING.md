@@ -22,6 +22,7 @@ node verification/recovery-current.mjs openai-responses
 node verification/recovery-current.mjs openai-completions
 node verification/recovery-current.mjs anthropic-messages
 node verification/timeout-current.mjs
+node verification/provider.test.mjs --host
 ```
 
 These scripts use the installed adapter and native agent machinery, with an in-memory configuration editor and simulated network. They do not verify real profile persistence or an upstream service's behavior. Do not claim otherwise in a change description.

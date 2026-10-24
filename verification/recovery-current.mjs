@@ -4,7 +4,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { runInCurrentRuntime, importCurrent, currentRequire } from './current-runtime.mjs'
 import { installRequestRecovery } from '../plugins/dsh-llm-compat/lib/recovery.js'
 import { createCompatibleFetch } from '../plugins/dsh-llm-compat/lib/transport.js'
-import { USER_AGENTS } from '../plugins/dsh-llm-compat/lib/user-agent.js'
+import { installProviderContext } from '../plugins/dsh-llm-compat/lib/provider-context.js'
+import { USER_AGENTS, providerRequestSettings } from '../plugins/dsh-llm-compat/lib/user-agent.js'
 import { fixtureResponse, openAiFixture, responsesFixture, anthropicFixture } from './harness.mjs'
 
 runInCurrentRuntime(fileURLToPath(import.meta.url), process.argv.slice(2))
@@ -53,18 +54,20 @@ const scenarios = [
 ]
 const reports = []
 for (const scenario of scenarios) {
-  const settings = { enabled: true, headerMode: scenario.headerMode ?? 'native', customUserAgent: 'ExampleClient/3.0', recoveryMode: scenario.mode, maxRetries: scenario.maximum, retryDelaySeconds: 1.25, retryForever: !!scenario.forever, maxAutoContinues: 2, continueDelaySeconds: 3.5, continueMessage: '继续完成测试任务，保留已完成结果。' }
+  const settings = { enabled: true, headerMode: 'native', providerHeaders: { primary: { headerMode: scenario.headerMode ?? 'native', customUserAgent: 'ExampleClient/3.0' } }, recoveryMode: scenario.mode, maxRetries: scenario.maximum, retryDelaySeconds: 1.25, retryForever: !!scenario.forever, maxAutoContinues: 2, continueDelaySeconds: 3.5, continueMessage: '继续完成测试任务，保留已完成结果。' }
   const records = [], requests = [], delays = []
   let nativeHeaders
   const recovery = installRequestRecovery(ctx, { config: () => settings, createUserMessage, record: fact => records.push(fact), sleep: async ms => { delays.push(ms) } })
+  const providerContext = installProviderContext(ctx)
   const original = globalThis.fetch
   const compat = createCompatibleFetch(async (input, init) => {
     const headers = new Headers(init.headers)
-    const expected = settings.headerMode === 'custom' ? settings.customUserAgent : USER_AGENTS[settings.headerMode]
-    if (settings.headerMode === 'native') assert.match(headers.get('user-agent'), /deepseek-harness/i)
+    const selected = settings.providerHeaders.primary
+    const expected = selected.headerMode === 'custom' ? selected.customUserAgent : USER_AGENTS[selected.headerMode]
+    if (selected.headerMode === 'native') assert.match(headers.get('user-agent'), /deepseek-harness/i)
     else assert.equal(headers.get('user-agent'), expected)
     const expectedHeaders = new Headers(nativeHeaders)
-    if (settings.headerMode !== 'native') expectedHeaders.set('user-agent', expected)
+    if (selected.headerMode !== 'native') expectedHeaders.set('user-agent', expected)
     assert.deepEqual([...headers], [...expectedHeaders], 'preserve every SDK header except the selected User-Agent')
     assert.equal(headers.has('x-claude-code-session-id'), false)
     assert.equal(headers.has('x-app'), false)
@@ -79,7 +82,7 @@ for (const scenario of scenarios) {
     if (failure === 503) return new Response('<!doctype html><html>fixture upstream failure</html>', { status: 503 })
     if (failure) return Response.json({ error: { message: 'fixture HTTP failure', type: 'fixture_error' } }, { status: failure })
     return fixtureResponse(api === 'openai-responses' ? responsesFixture(true) : api === 'anthropic-messages' ? anthropicFixture(true) : openAiFixture(true))
-  }, { config: () => settings })
+  }, { config: () => providerRequestSettings(settings, providerContext.current()) })
   globalThis.fetch = (input, init) => { nativeHeaders = new Headers(init.headers); return compat.fetch(input, init) }
   const session = ctx.sessions.create('recovery-current-' + scenario.name, { meta: { cwd: process.cwd() } })
   const agent = new ReactLoopAgent(ctx, session.id, { provider: 'primary', model: 'fixture-model', maxTokens: 256 }, session)
@@ -112,7 +115,7 @@ for (const scenario of scenarios) {
     const report = { name: scenario.name, result: 'PASS', requests: requests.length, retries: retries.map(e => e.data), messages: messages.map(e => e.data), records, terminal: last }
     reports.push(report)
     console.log(JSON.stringify({ result: 'PASS', api, scenario: scenario.name, requests: requests.length, retries: retries.length, userMessages: messages.length }))
-  } finally { recovery.dispose(); compat.deactivate(); globalThis.fetch = original; registry.delete(agent.id); await agent.scope.dispose() }
+  } finally { recovery.dispose(); compat.deactivate(); providerContext.dispose(); globalThis.fetch = original; registry.delete(agent.id); await agent.scope.dispose() }
 }
 fs.mkdirSync(new URL('./results/', import.meta.url), { recursive: true })
 fs.writeFileSync(new URL(`./results/recovery-v3-${api}.json`, import.meta.url), JSON.stringify({ runtime: process.versions.electron, node: process.version, api, scenarios: reports }, null, 2) + '\n', 'utf8')

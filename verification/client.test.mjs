@@ -10,10 +10,10 @@ const { Context } = await importCurrent('@deepseek-ai/cordis')
 
 // Cordis enforces service declarations and React DOM validates the full element tree.
 // Hook state and RPC responses are simulated so save/error paths remain deterministic.
-function harness({ reject = false, writable = true, providers } = {}) {
+function harness({ reject = false, writable = true, providers = { primary: {}, backup: {} }, legacy = {} } = {}) {
   const values = [], effects = [], writes = []
   let cursor = 0, component, module, mounted = false, tree
-  const initial = { enabled: true, headerMode: 'native', customUserAgent: 'custom-client/1.0', recoveryMode: 'retry', maxRetries: 5, retryDelaySeconds: 2, retryForever: false, maxAutoContinues: 3, continueDelaySeconds: 2, continueMessage: '请继续完成。' }
+  const initial = { enabled: true, headerMode: 'native', customUserAgent: 'custom-client/1.0', recoveryMode: 'retry', maxRetries: 5, retryDelaySeconds: 2, retryForever: false, maxAutoContinues: 3, continueDelaySeconds: 2, continueMessage: '请继续完成。', providerHeaders: {}, ...legacy }
   let row = { ns: 'llm-compat', value: initial, revision: 7 }
   let nativeRow = providers && { ns: 'llm-pi-ai', value: { providers }, revision: 11 }
   const React = {
@@ -27,14 +27,16 @@ function harness({ reject = false, writable = true, providers } = {}) {
       async describe() { return { ok: true, value: { writable, namespaces: [row, ...(nativeRow ? [nativeRow] : [])] } } },
       async update(ns, patch, revision) {
         writes.push({ ns, patch, revision })
-        if (reject) return { ok: false, error: { message: 'settings/conflict' } }
+        if (typeof reject === 'function' ? reject(ns, writes.length) : reject) return { ok: false, error: { message: 'settings/conflict' } }
         if (ns === 'llm-pi-ai') {
           const next = { ...nativeRow.value.providers }
           for (const [id, fields] of Object.entries(patch.providers)) next[id] = { ...next[id], ...fields }
           nativeRow = { ...nativeRow, revision: nativeRow.revision + 1, value: { providers: next } }
           return { ok: true, value: nativeRow }
         }
-        row = { ...row, value: { ...row.value, ...patch }, revision: row.revision + 1 }
+        const value = { ...row.value, ...patch }
+        if (patch.providerHeaders) value.providerHeaders = { ...row.value.providerHeaders, ...patch.providerHeaders }
+        row = { ...row, value, revision: row.revision + 1 }
         return { ok: true, value: row }
       },
     } },
@@ -66,8 +68,8 @@ function harness({ reject = false, writable = true, providers } = {}) {
   return { writes, render, nodes, control, dispose() { plugin.dispose(); provider.dispose() }, async load() { await provider; await plugin; render(); for (const fn of effects) fn(); await new Promise(resolve => setImmediate(resolve)); render() },
     change(label, value) { assert.equal(control(label).props.disabled, false); control(label).props.onChange({ target: { value } }); render() },
     toggle(label, checked) { assert.equal(control(label).props.disabled, false); control(label).props.onChange({ target: { checked } }); render() },
-    async save() { await nodes().find(n => n.type === 'form').props.onSubmit({ preventDefault() {} }); render() },
-    async saveTimeout() { await control('流空闲超时设置').props.onSubmit({ preventDefault() {} }); render() },
+    async save() { await control('全局重试设置').props.onSubmit({ preventDefault() {} }); render() },
+    async saveChannel() { await control('渠道请求设置').props.onSubmit({ preventDefault() {} }); render() },
   }
 }
 
@@ -76,17 +78,17 @@ test('settings page saves only edited fields with the loaded revision; custom UA
   assert.equal(f.nodes().some(n => n.props['aria-label'] === '自定义 User-Agent'), false)
   f.change('User-Agent 模式', 'custom'); f.change('自定义 User-Agent', 'ExampleClient/1.0')
   f.change('恢复模式', 'continue'); f.change('继续消息内容', '继续测试')
-  f.change('额外重试次数', '60'); await f.save()
-  assert.deepEqual(JSON.parse(JSON.stringify(f.writes)), [{ ns: 'llm-compat', patch: { headerMode: 'custom', customUserAgent: 'ExampleClient/1.0', recoveryMode: 'continue', maxRetries: 60, continueMessage: '继续测试' }, revision: 7 }])
-  assert.ok(f.nodes().find(n => n.props.role === 'status').children.join('').startsWith('已保存'))
+  f.change('额外重试次数', '60'); await f.saveChannel(); await f.save()
+  assert.deepEqual(JSON.parse(JSON.stringify(f.writes)), [{ ns: 'llm-compat', patch: { providerHeaders: { primary: { headerMode: 'custom', customUserAgent: 'ExampleClient/1.0' } } }, revision: 7 }, { ns: 'llm-compat', patch: { recoveryMode: 'continue', maxRetries: 60, continueMessage: '继续测试' }, revision: 8 }])
+  assert.ok(f.nodes().some(n => n.props.role === 'status' && n.children.join('').startsWith('已保存')))
   assert.equal(f.nodes().find(n => n.type === 'button').props.disabled, true)
 })
 
 test('settings conflict retains unsaved changes and reports failure', async t => {
   const f = harness({ reject: true }); t.after(() => f.dispose()); await f.load(); f.change('额外重试次数', '60'); await f.save()
-  assert.match(f.nodes().find(n => n.props.role === 'status').children.join(''), /保存失败.*conflict/)
+  assert.ok(f.nodes().some(n => n.props.role === 'status' && /保存失败.*conflict/.test(n.children.join(''))))
   assert.equal(f.nodes().find(n => n.props['aria-label'] === '额外重试次数').props.value, 60)
-  assert.equal(f.nodes().find(n => n.type === 'button').props.disabled, false)
+  assert.equal(f.nodes().find(n => n.type === 'button' && n.children.includes('保存全局配置')).props.disabled, false)
 })
 
 test('mode descriptions follow the selected User-Agent and recovery modes before saving', async t => {
@@ -120,12 +122,12 @@ test('master switch disables subordinate fields, remains saveable, and preserves
   const f = harness(); t.after(() => f.dispose()); await f.load()
   f.change('User-Agent 模式', 'custom'); f.change('自定义 User-Agent', 'ExampleClient/1.0')
   f.change('恢复模式', 'continue'); f.change('额外重试次数', '60')
-  f.change('继续消息内容', '保留已完成的工作，继续。'); await f.save()
+  f.change('继续消息内容', '保留已完成的工作，继续。'); await f.saveChannel(); await f.save()
   f.toggle('启用模型请求控制与统一重试', false)
   for (const node of f.nodes().filter(n => ['input', 'select', 'textarea'].includes(n.type))) {
-    assert.equal(node.props.disabled, node.props['aria-label'] !== '启用模型请求控制与统一重试')
+    assert.equal(node.props.disabled, !['启用模型请求控制与统一重试', '模型渠道', '流空闲超时（秒）'].includes(node.props['aria-label']))
   }
-  assert.equal(f.nodes().find(n => n.type === 'button').props.disabled, false)
+  assert.equal(f.nodes().find(n => n.type === 'button' && n.children.includes('保存全局配置')).props.disabled, false)
   await f.save()
   assert.deepEqual(JSON.parse(JSON.stringify(f.writes.at(-1).patch)), { enabled: false })
   f.toggle('启用模型请求控制与统一重试', true)
@@ -183,33 +185,85 @@ test('timeout saves one native provider field in milliseconds and keeps plugin d
   assert.equal(f.control('流空闲超时（秒）').props.value, 300)
   f.change('额外重试次数', '60')
   f.change('流空闲超时（秒）', '600')
-  f.change('超时设置的模型渠道', 'backup')
+  f.change('模型渠道', 'backup')
   assert.equal(f.control('流空闲超时（秒）').props.value, 120)
-  f.change('流空闲超时（秒）', '900'); await f.saveTimeout()
+  f.change('流空闲超时（秒）', '900'); await f.saveChannel()
   assert.deepEqual(JSON.parse(JSON.stringify(f.writes)), [{ ns: 'llm-pi-ai', patch: { providers: { backup: { streamIdleTimeoutMs: 900000 } } }, revision: 11 }])
   assert.equal(f.control('额外重试次数').props.value, 60)
-  f.change('超时设置的模型渠道', 'primary')
+  f.change('模型渠道', 'primary')
   assert.equal(f.control('流空闲超时（秒）').props.value, '600')
-  assert.ok(f.nodes().some(n => n.props.role === 'status' && n.children.join('') === '有未保存的超时修改'))
+  assert.ok(f.nodes().some(n => n.props.role === 'status' && n.children.join('') === '当前渠道有未保存的修改'))
   f.toggle('启用模型请求控制与统一重试', false)
   assert.equal(f.control('流空闲超时（秒）').props.disabled, false)
-  await f.saveTimeout()
+  await f.saveChannel()
   assert.deepEqual(JSON.parse(JSON.stringify(f.writes.at(-1))), { ns: 'llm-pi-ai', patch: { providers: { primary: { streamIdleTimeoutMs: 600000 } } }, revision: 12 })
 })
 
 test('timeout rejects invalid intervals and retains draft on revision conflict', async t => {
   const f = harness({ reject: true, providers: { primary: {} } }); t.after(() => f.dispose()); await f.load()
-  for (const value of ['', '0', '-1', '2147483.648']) { f.change('流空闲超时（秒）', value); await f.saveTimeout() }
+  for (const value of ['', '0', '-1', '2147483.648']) { f.change('流空闲超时（秒）', value); await f.saveChannel() }
   assert.equal(f.writes.length, 0)
-  f.change('流空闲超时（秒）', '600'); await f.saveTimeout()
+  f.change('流空闲超时（秒）', '600'); await f.saveChannel()
   assert.equal(f.control('流空闲超时（秒）').props.value, '600')
-  assert.ok(f.nodes().some(n => n.props.role === 'status' && /超时保存失败.*conflict/.test(n.children.join(''))))
+  assert.ok(f.nodes().some(n => n.props.role === 'status' && /渠道配置保存失败.*conflict/.test(n.children.join(''))))
 })
 
 test('native timeout fields remain read-only when the profile cannot be edited', async t => {
   const f = harness({ writable: false, providers: { primary: {} } }); t.after(() => f.dispose()); await f.load()
   assert.equal(f.control('流空闲超时（秒）').props.disabled, true)
-  assert.equal(f.control('超时设置的模型渠道').props.disabled, true)
-  await f.saveTimeout()
+  assert.equal(f.control('模型渠道').props.disabled, true)
+  await f.saveChannel()
   assert.equal(f.writes.length, 0)
+})
+
+test('channel drafts and saved identities remain isolated, including legacy defaults', async t => {
+  const f = harness({ legacy: { headerMode: 'codex' } }); t.after(() => f.dispose()); await f.load()
+  assert.equal(f.control('User-Agent 模式').props.value, 'codex')
+  f.change('User-Agent 模式', 'custom'); f.change('自定义 User-Agent', 'Primary/1.0')
+  f.change('流空闲超时（秒）', '600')
+  f.change('模型渠道', 'backup')
+  assert.equal(f.control('User-Agent 模式').props.value, 'codex')
+  assert.equal(f.control('流空闲超时（秒）').props.value, 300)
+  f.change('User-Agent 模式', 'native'); await f.saveChannel()
+  assert.deepEqual(JSON.parse(JSON.stringify(f.writes[0].patch)), { providerHeaders: { backup: { headerMode: 'native', customUserAgent: 'custom-client/1.0' } } })
+  f.change('模型渠道', 'primary')
+  assert.equal(f.control('自定义 User-Agent').props.value, 'Primary/1.0')
+  assert.equal(f.control('流空闲超时（秒）').props.value, '600')
+  await f.saveChannel()
+  assert.deepEqual(f.writes.map(w => [w.ns, w.revision]), [['llm-compat', 7], ['llm-compat', 8], ['llm-pi-ai', 11]])
+  f.change('模型渠道', 'backup')
+  assert.equal(f.control('User-Agent 模式').props.value, 'native')
+  assert.equal(f.control('流空闲超时（秒）').props.value, 300)
+  f.change('模型渠道', 'primary')
+  assert.equal(f.control('User-Agent 模式').props.value, 'custom')
+  assert.equal(f.control('流空闲超时（秒）').props.value, 600)
+})
+
+test('partial channel save reports the saved identity and retries only the failed timeout', async t => {
+  const f = harness({ reject: (ns, count) => ns === 'llm-pi-ai' && count === 2 }); t.after(() => f.dispose()); await f.load()
+  f.change('User-Agent 模式', 'claude-code'); f.change('流空闲超时（秒）', '600')
+  await f.saveChannel()
+  assert.ok(f.nodes().some(n => n.props.role === 'status' && /User-Agent 已保存，流空闲超时保存失败/.test(n.children.join(''))))
+  assert.equal(f.control('流空闲超时（秒）').props.value, '600')
+  await f.saveChannel()
+  assert.deepEqual(f.writes.map(w => w.ns), ['llm-compat', 'llm-pi-ai', 'llm-pi-ai'])
+  assert.equal(f.control('User-Agent 模式').props.value, 'claude-code')
+  assert.equal(f.control('流空闲超时（秒）').props.value, 600)
+})
+
+test('invalid custom identities never partially save a channel timeout', async t => {
+  const f = harness(); t.after(() => f.dispose()); await f.load()
+  f.change('User-Agent 模式', 'custom'); f.change('流空闲超时（秒）', '600')
+  for (const value of ['', ' ', '中文', 'x\r\nInjected: y']) {
+    f.change('自定义 User-Agent', value); await f.saveChannel()
+  }
+  assert.equal(f.writes.length, 0)
+})
+
+test('without channels the page explains how to add one and global recovery stays editable', async t => {
+  const f = harness({ providers: {} }); t.after(() => f.dispose()); await f.load()
+  assert.equal(f.control('User-Agent 模式'), undefined)
+  assert.ok(f.nodes().some(n => /尚未配置模型渠道/.test(n.children.join(''))))
+  f.change('额外重试次数', '20'); await f.save()
+  assert.deepEqual(JSON.parse(JSON.stringify(f.writes[0].patch)), { maxRetries: 20 })
 })

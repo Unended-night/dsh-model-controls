@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test verification/client.test.mjs verification/user-agent.test.mjs verification/transport.test.mjs verification/recovery.test.mjs verification/native.test.mjs verification/schema.test.mjs",
+    "test": "node --test verification/client.test.mjs verification/user-agent.test.mjs verification/transport.test.mjs verification/recovery.test.mjs verification/native.test.mjs verification/schema.test.mjs verification/provider.test.mjs",
     "test:ui": "node verification/settings-layout.mjs",
     "check:release": "node scripts/release-check.mjs",
     "pack:review": "node scripts/pack-review.mjs"

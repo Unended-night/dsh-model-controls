@@ -51,7 +51,7 @@ window.__ModuleLoader__.load({ id: 'dsh-llm-compat', factory: require => {
     .dsh-llm-compat-settings .dsh-llm-compat-save:enabled:hover { background: var(--dsw-alias-interactive-bg-hover, #343b48); }
     .dsh-llm-compat-settings .dsh-llm-compat-save:disabled { opacity: .45; cursor: not-allowed; }
     .dsh-llm-compat-settings .dsh-llm-compat-status { margin: 0; flex: 1 1 220px; font-size: 12px; color: var(--dsh-llm-compat-muted); overflow-wrap: anywhere; }
-    .dsh-llm-compat-settings .dsh-llm-compat-timeout { margin-top: 24px; }
+    .dsh-llm-compat-settings .dsh-llm-compat-provider-footer { margin-top: 18px; }
   `
   const headers = [
     ['native', '原生（默认）'],
@@ -99,12 +99,11 @@ window.__ModuleLoader__.load({ id: 'dsh-llm-compat', factory: require => {
     }
   }
 
-  function StreamTimeoutSettings({ ctx }) {
+  function ProviderSettings({ ctx, configView, onConfigSaved, enabled, busy, setBusy }) {
     const [view, setView] = useState(null)
     const [provider, setProvider] = useState('')
     const [drafts, setDrafts] = useState({})
     const [writable, setWritable] = useState(false)
-    const [busy, setBusy] = useState(false)
     const [status, setStatus] = useState('正在读取模型渠道…')
     useEffect(() => {
       let active = true
@@ -112,7 +111,7 @@ window.__ModuleLoader__.load({ id: 'dsh-llm-compat', factory: require => {
         if (!active) return
         if (!result.ok) throw new Error(result.error.message)
         const row = result.value.namespaces.find(item => item.ns === 'llm-pi-ai')
-        if (!row) { setStatus('未找到可配置的 pi-ai 模型渠道。'); return }
+        if (!row) { setStatus('未找到可配置的模型渠道，请先在模型设置中添加。'); return }
         setView(row)
         setProvider(Object.keys(row.value.providers)[0] ?? '')
         setWritable(result.value.writable)
@@ -122,44 +121,75 @@ window.__ModuleLoader__.load({ id: 'dsh-llm-compat', factory: require => {
     }, [ctx])
     const providers = view?.value.providers ?? {}
     const route = providers[provider]
-    const savedMs = route?.streamIdleTimeoutMs ?? 300000
-    const seconds = drafts[provider] ?? savedMs / 1000
-    const milliseconds = Math.round(Number(seconds) * 1000)
-    const valid = seconds !== '' && Number.isFinite(milliseconds) && milliseconds >= 1 && milliseconds <= 2147483647
-    const dirty = Boolean(route) && valid && milliseconds !== savedMs
-    const locked = busy || !writable
+    const defaults = configView?.value ?? {}
+    const savedHeader = defaults.providerHeaders?.[provider] ?? defaults
+    const saved = {
+      headerMode: savedHeader.headerMode ?? 'native',
+      customUserAgent: savedHeader.customUserAgent ?? 'custom-client/1.0',
+      seconds: (route?.streamIdleTimeoutMs ?? 300000) / 1000,
+    }
+    const draft = { ...saved, ...drafts[provider] }
+    const milliseconds = Math.round(Number(draft.seconds) * 1000)
+    const validTimeout = draft.seconds !== '' && Number.isFinite(milliseconds) && milliseconds >= 1 && milliseconds <= 2147483647
+    const validHeader = draft.headerMode !== 'custom' || /^[\x21-\x7e][\x20-\x7e]*$/.test(draft.customUserAgent)
+    const headerDirty = draft.headerMode !== saved.headerMode || draft.customUserAgent !== saved.customUserAgent
+    const timeoutDirty = milliseconds !== saved.seconds * 1000
+    const dirty = Boolean(route) && (headerDirty || timeoutDirty)
+    const locked = busy || !writable || !configView
+    const identityDisabled = locked || !enabled
+    const change = (key, value) => {
+      setDrafts(previous => ({ ...previous, [provider]: { ...previous[provider], [key]: value } }))
+      setStatus('')
+    }
     const save = async event => {
       event.preventDefault()
-      if (!dirty || locked) return
-      setBusy(true); setStatus('正在保存超时…')
+      if (!dirty || locked || !validTimeout || !validHeader) return
+      setBusy(true); setStatus('正在保存当前渠道…')
+      let headerSaved = false
       try {
-        // Send only this field: never round-trip redacted credentials or models.
-        const result = await ctx.remote.settings.update(view.ns, { providers: { [provider]: { streamIdleTimeoutMs: milliseconds } } }, view.revision)
-        if (!result.ok) throw new Error(result.error.message)
-        setView(result.value)
+        if (headerDirty) {
+          const patch = { providerHeaders: { [provider]: { headerMode: draft.headerMode, customUserAgent: draft.customUserAgent } } }
+          const result = await ctx.remote.settings.update(configView.ns, patch, configView.revision)
+          if (!result.ok) throw new Error(result.error.message)
+          onConfigSaved(result.value)
+          headerSaved = true
+        }
+        if (timeoutDirty) {
+          // Never round-trip redacted credentials, models, or another channel.
+          const result = await ctx.remote.settings.update(view.ns, { providers: { [provider]: { streamIdleTimeoutMs: milliseconds } } }, view.revision)
+          if (!result.ok) throw new Error(result.error.message)
+          setView(result.value)
+        }
         setDrafts(previous => { const next = { ...previous }; delete next[provider]; return next })
-        setStatus('超时已保存；后续新模型调用生效，无需重启。正在进行的调用保持原值。')
-      } catch (error) { setStatus(`超时保存失败：${error.message}。当前输入已保留；可重新打开此页读取最新配置。`) }
-      finally { setBusy(false) }
+        setStatus('渠道配置已保存；后续请求生效，无需重启。进行中的调用保持原超时。')
+      } catch (error) {
+        setStatus((headerSaved ? 'User-Agent 已保存，流空闲超时保存失败：' : '渠道配置保存失败：') + error.message + '。未保存的输入已保留；可重新打开此页读取最新配置。')
+      } finally { setBusy(false) }
     }
-    return h('form', { className: 'dsh-llm-compat-timeout', 'aria-label': '流空闲超时设置', onSubmit: save },
-      h('div', { className: 'dsh-llm-compat-card' },
-        h('h3', {}, '流空闲超时'),
-        h('p', { className: 'dsh-llm-compat-intro' }, '按模型渠道设置连续多久没有有效输出才终止请求。默认 300 秒（5 分钟），每次收到文字、思考或工具调用等输出后重新计时。'),
-        route ? h('fieldset', { disabled: locked },
-          h('div', { className: 'dsh-llm-compat-grid' },
-            h('label', { className: 'dsh-llm-compat-field' },
-              h('span', { className: 'dsh-llm-compat-label' }, '模型渠道'),
-              h('select', { className: 'dsh-llm-compat-control dsh-llm-compat-select', 'aria-label': '超时设置的模型渠道', value: provider, disabled: locked, onChange: e => { setProvider(e.target.value); setStatus('') } },
-                Object.entries(providers).map(([id, profile]) => h('option', { key: id, value: id }, profile.displayName ? `${profile.displayName}（${id}）` : id)))),
-            h('label', { className: 'dsh-llm-compat-field' },
-              h('span', { className: 'dsh-llm-compat-label' }, '流空闲超时（秒）'),
-              h('input', { className: 'dsh-llm-compat-control', 'aria-label': '流空闲超时（秒）', 'aria-describedby': 'dsh-llm-compat-timeout-help', type: 'number', required: true, min: .001, max: 2147483.647, step: .001, value: seconds, disabled: locked, onChange: e => { const value = e.target.value; setDrafts(previous => ({ ...previous, [provider]: value })); setStatus('有未保存的超时修改') } }))),
-          h('p', { id: 'dsh-llm-compat-timeout-help', className: 'dsh-llm-compat-help' }, '例如 600 秒为 10 分钟。此项是该渠道的原生超时，独立保存，不受上方请求控制总开关影响。'),
-          h('div', { className: 'dsh-llm-compat-footer' },
-            h('button', { type: 'submit', className: 'dsh-llm-compat-save', disabled: locked || !dirty }, busy ? '保存中…' : '保存超时'),
-            h('p', { role: 'status', className: 'dsh-llm-compat-status', 'aria-live': 'polite' }, status || (Object.hasOwn(drafts, provider) ? '有未保存的超时修改' : '显示当前渠道已保存的超时'))))
-          : h('p', { role: 'status', className: 'dsh-llm-compat-status' }, status || '尚未配置模型渠道，请先在模型设置中添加。')))
+    const field = (label, control, help, id, disabled = locked) => h('label', { className: 'dsh-llm-compat-field', 'data-disabled': disabled },
+      h('span', { className: 'dsh-llm-compat-label' }, label), control,
+      help && h('span', { id, className: 'dsh-llm-compat-help' }, help))
+    return h('form', { className: 'dsh-llm-compat-provider dsh-llm-compat-card', 'aria-label': '渠道请求设置', onSubmit: save },
+      h('h3', {}, '渠道请求配置'),
+      h('p', { className: 'dsh-llm-compat-intro' }, '选择模型渠道，分别设置它的请求身份和流空闲超时。切换渠道会保留未保存的输入。'),
+      route ? h('fieldset', { disabled: locked },
+        field('模型渠道', h('select', { className: 'dsh-llm-compat-control dsh-llm-compat-select', 'aria-label': '模型渠道', value: provider, disabled: locked, onChange: e => { setProvider(e.target.value); setStatus('') } },
+          Object.entries(providers).map(([id, profile]) => h('option', { key: id, value: id }, profile.displayName ? profile.displayName + '（' + id + '）' : id)))),
+        h('div', { className: 'dsh-llm-compat-grid' },
+          field('User-Agent 模式', h('select', { className: 'dsh-llm-compat-control dsh-llm-compat-select', 'aria-label': 'User-Agent 模式', 'aria-describedby': 'llm-compat-headerMode-help', value: draft.headerMode, disabled: identityDisabled, onChange: e => change('headerMode', e.target.value) },
+            headers.map(([value, text]) => h('option', { key: value, value }, text))), headerHelp[draft.headerMode], 'llm-compat-headerMode-help', identityDisabled),
+          field('流空闲超时（秒）', h('input', { className: 'dsh-llm-compat-control', 'aria-label': '流空闲超时（秒）', 'aria-describedby': 'dsh-llm-compat-timeout-help', type: 'number', required: true, min: .001, max: 2147483.647, step: .001, value: draft.seconds, disabled: locked, onChange: e => change('seconds', e.target.value) }),
+            '连续没有有效输出的等待上限。默认 300 秒；600 秒为 10 分钟。收到有效输出后重新计时。', 'dsh-llm-compat-timeout-help')),
+        draft.headerMode === 'custom' && field('自定义 User-Agent', h('input', {
+          className: 'dsh-llm-compat-control', 'aria-label': '自定义 User-Agent', required: true, pattern: '[!-~][ -~]*', value: draft.customUserAgent, disabled: identityDisabled,
+          onChange: e => change('customUserAgent', e.target.value),
+        }), '仅用于当前渠道。填写单行 ASCII 文本，例如 MyClient/1.0。', undefined, identityDisabled),
+        !enabled && h('p', { className: 'dsh-llm-compat-help' }, '请求控制已关闭，User-Agent 设置暂不生效；流空闲超时仍可编辑并生效。'),
+        !defaults.providerHeaders?.[provider] && saved.headerMode !== 'native' && h('p', { className: 'dsh-llm-compat-help' }, '当前沿用升级前的默认身份。修改并保存后，仅对这个渠道生效。'),
+        h('div', { className: 'dsh-llm-compat-footer dsh-llm-compat-provider-footer' },
+          h('button', { type: 'submit', className: 'dsh-llm-compat-save', disabled: locked || !dirty || !validTimeout || !validHeader }, busy ? '保存中…' : '保存渠道配置'),
+          h('p', { role: 'status', className: 'dsh-llm-compat-status', 'aria-live': 'polite' }, status || (dirty ? '当前渠道有未保存的修改' : '当前渠道的配置已保存'))))
+        : h('p', { role: 'status', className: 'dsh-llm-compat-status' }, status || '尚未配置模型渠道，请先在模型设置中添加。'))
   }
 
   function Settings({ ctx }) {
@@ -181,12 +211,14 @@ window.__ModuleLoader__.load({ id: 'dsh-llm-compat', factory: require => {
       return () => { active = false }
     }, [ctx])
     const change = (key, value) => { setDraft(previous => ({ ...previous, [key]: value })); setStatus('有未保存的修改') }
-    const dirty = view && draft && Object.keys(draft).some(key => draft[key] !== view.value[key])
+    const globalKeys = ['enabled', 'recoveryMode', 'maxRetries', 'retryDelaySeconds', 'retryForever', 'maxAutoContinues', 'continueDelaySeconds', 'continueMessage']
+    const dirty = view && draft && globalKeys.some(key => draft[key] !== view.value[key])
     const save = async event => {
       event.preventDefault()
+      if (!dirty || locked) return
       setBusy(true); setStatus('正在保存…')
       try {
-        const patch = Object.fromEntries(Object.entries(draft).filter(([key, value]) => value !== view.value[key]))
+        const patch = Object.fromEntries(globalKeys.filter(key => draft[key] !== view.value[key]).map(key => [key, draft[key]]))
         const result = await ctx.remote.settings.update(view.ns, patch, view.revision)
         if (!result.ok) throw new Error(result.error.message)
         setView(result.value); setDraft({ ...result.value.value })
@@ -217,15 +249,11 @@ window.__ModuleLoader__.load({ id: 'dsh-llm-compat', factory: require => {
       h('style', {}, styles),
       h('h2', {}, '模型请求控制'),
       h('p', { className: 'dsh-llm-compat-intro' }, '设置请求身份与失败后的处理方式。保存后用于后续请求，无需重启。'),
-      draft && h('form', { onSubmit: save }, h('fieldset', { disabled: locked },
-        h('div', { className: 'dsh-llm-compat-master' }, toggle('enabled', '启用模型请求控制与统一重试', draft.enabled ? '统一管理请求头与重试策略。' : '已关闭：以下配置暂不使用，原有数值会保留。', locked)),
-        h('div', { className: 'dsh-llm-compat-card' }, h('h3', {}, '请求身份'),
-          select('headerMode', 'User-Agent 模式', headers, headerHelp[draft.headerMode]),
-          draft.headerMode === 'custom' && field('customUserAgent', '自定义 User-Agent', h('input', {
-            ...controlProps('customUserAgent', '自定义 User-Agent'), required: true, pattern: '[!-~][ -~]*',
-            onChange: e => change('customUserAgent', e.target.value),
-          }), '填写单行 ASCII 文本，例如 MyClient/1.0。')),
-        h('div', { className: 'dsh-llm-compat-card' }, h('h3', {}, '失败处理'),
+      h(ProviderSettings, { ctx, configView: view, onConfigSaved: setView, enabled: draft?.enabled ?? true, busy, setBusy }),
+      draft && h('form', { 'aria-label': '全局重试设置', onSubmit: save }, h('fieldset', { disabled: locked },
+        h('div', { className: 'dsh-llm-compat-master' }, toggle('enabled', '启用模型请求控制与统一重试', draft.enabled ? '作用于渠道身份与全局重试；流空闲超时独立生效。' : '已关闭：身份与重试暂不生效，原有配置保留。流空闲超时不受影响。', locked)),
+        h('div', { className: 'dsh-llm-compat-card' }, h('h3', {}, '全局失败处理'),
+          h('p', { className: 'dsh-llm-compat-intro' }, '以下重试与自动继续策略适用于所有模型渠道。'),
           select('recoveryMode', '恢复模式', [['retry', '连续重试'], ['continue', '重试耗尽后发送继续消息']], recoveryHelp[draft.recoveryMode]),
           draft.recoveryMode === 'retry' && toggle('retryForever', '不限重试次数', '持续尝试，直到成功或手动停止；下方次数上限不再生效。'),
           h('div', { className: 'dsh-llm-compat-grid' },
@@ -237,10 +265,9 @@ window.__ModuleLoader__.load({ id: 'dsh-llm-compat', factory: require => {
           number('continueDelaySeconds', '发送继续消息前等待（秒）', 0, 86400, 'any', noContinues ? '自动继续次数为 0，发送间隔暂不使用。' : '失败轮次结束后，等待多久再发送消息。', optionsDisabled || noContinues)),
           field('continueMessage', '继续消息内容', h('textarea', { ...controlProps('continueMessage', '继续消息内容', optionsDisabled || noContinues), rows: 3, onChange: e => change('continueMessage', e.target.value) }), noContinues ? '自动继续次数为 0，消息内容保留但不会发送。' : '作为可见的用户消息发送，附带插件来源与自动继续次数。', optionsDisabled || noContinues)),
         h('div', { className: 'dsh-llm-compat-footer' },
-          h('button', { type: 'submit', disabled: !dirty || locked, className: 'dsh-llm-compat-save' }, busy ? '保存中…' : '保存配置'),
+          h('button', { type: 'submit', disabled: !dirty || locked, className: 'dsh-llm-compat-save' }, busy ? '保存中…' : '保存全局配置'),
           h('p', { role: 'status', 'aria-live': 'polite', className: 'dsh-llm-compat-status' }, status || '配置已保存')))),
-      !draft && h('p', { role: 'status', 'aria-live': 'polite', className: 'dsh-llm-compat-status' }, status),
-      h(StreamTimeoutSettings, { ctx }))
+      !draft && h('p', { role: 'status', 'aria-live': 'polite', className: 'dsh-llm-compat-status' }, status))
   }
 
   return {

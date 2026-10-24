@@ -14,7 +14,6 @@ const page = await browser.newPage({ viewport: { width: 960, height: 1000 } })
 const errors = []
 page.on('pageerror', error => errors.push(error.message))
 const control = label => page.getByLabel(label, { exact: true })
-const prefix = '.dsh-llm-compat-'
 try {
   await page.setContent(`<!doctype html><html lang="zh-CN"><meta charset="utf-8"><style>
     body { margin: 0; background: #141820; color: #edf0f6; font: 14px/1.5 "Segoe UI", "Microsoft YaHei", sans-serif; }
@@ -29,7 +28,7 @@ try {
     await page.addScriptTag({ path: join(root, 'umd', name + '.development.js') })
   }
   await page.evaluate(() => {
-    let row = { ns: 'llm-compat', revision: 7, value: { enabled: true, headerMode: 'native', customUserAgent: 'ExampleClient/1.0', recoveryMode: 'retry', maxRetries: 60, retryDelaySeconds: 1, retryForever: false, maxAutoContinues: 3, continueDelaySeconds: 2, continueMessage: '请继续完成。' } }
+    let row = { ns: 'llm-compat', revision: 7, value: { enabled: true, headerMode: 'native', customUserAgent: 'ExampleClient/1.0', recoveryMode: 'retry', maxRetries: 60, retryDelaySeconds: 1, retryForever: false, maxAutoContinues: 3, continueDelaySeconds: 2, continueMessage: '请继续完成。', providerHeaders: {} } }
     let nativeRow = { ns: 'llm-pi-ai', revision: 11, value: { providers: { primary: { displayName: '主渠道', streamIdleTimeoutMs: 300000 }, backup: { displayName: '备用渠道', streamIdleTimeoutMs: 120000 } } } }
     window.writes = []
     window.__ModuleLoader__ = { load({ factory }) {
@@ -47,7 +46,7 @@ try {
               nativeRow = { ...nativeRow, revision: revision + 1, value: { providers } }
               return { ok: true, value: nativeRow }
             }
-            row = { ...row, revision: revision + 1, value: { ...row.value, ...patch } }; return { ok: true, value: row }
+            const value = { ...row.value, ...patch }; if (patch.providerHeaders) value.providerHeaders = { ...row.value.providerHeaders, ...patch.providerHeaders }; row = { ...row, revision: revision + 1, value }; return { ok: true, value: row }
           },
         } },
       })
@@ -57,17 +56,17 @@ try {
   await control('额外重试次数').waitFor()
   const layout = () => page.evaluate(() => {
     const box = node => { const r = node.getBoundingClientRect(); return { x: r.x, y: r.y, right: r.right, bottom: r.bottom, width: r.width } }
-    const grid = document.querySelector('.dsh-llm-compat-grid')
+    const grid = document.querySelector('[aria-label="额外重试次数"]').closest('.dsh-llm-compat-grid')
     const card = grid.parentElement
     const input = document.querySelector('[aria-label="额外重试次数"]')
-    const timeout = document.querySelector('.dsh-llm-compat-timeout')
-    return { grid: box(grid), card: box(card), input: box(input), footer: box(document.querySelector('.dsh-llm-compat-footer')), timeout: { card: box(timeout.querySelector('.dsh-llm-compat-card')), controls: [...timeout.querySelectorAll('input, select, button')].map(box) }, position: getComputedStyle(grid).position, pointerEvents: getComputedStyle(grid).pointerEvents, padding: getComputedStyle(card).paddingLeft, overflow: document.documentElement.scrollWidth > innerWidth }
+    const timeout = document.querySelector('.dsh-llm-compat-provider')
+    return { grid: box(grid), card: box(card), input: box(input), footer: box(document.querySelector('[aria-label="全局重试设置"] .dsh-llm-compat-footer')), timeout: { card: box(timeout), controls: [...timeout.querySelectorAll('input, select, button')].map(box) }, position: getComputedStyle(grid).position, pointerEvents: getComputedStyle(grid).pointerEvents, padding: getComputedStyle(card).paddingLeft, overflow: document.documentElement.scrollWidth > innerWidth }
   })
   // Prove the fixture reproduces the reported collision when the old name returns.
-  await page.locator(`${prefix}grid`).first().evaluate(node => node.classList.add('lc-grid'))
+  await control('额外重试次数').evaluate(input => input.closest('.dsh-llm-compat-grid').classList.add('lc-grid'))
   assert.equal((await layout()).position, 'absolute')
   assert.equal((await layout()).pointerEvents, 'none')
-  await page.locator(`${prefix}grid`).first().evaluate(node => node.classList.remove('lc-grid'))
+  await control('额外重试次数').evaluate(input => input.closest('.dsh-llm-compat-grid').classList.remove('lc-grid'))
   const measurements = []
   for (const width of [680, 480, 320]) {
     await page.setViewportSize({ width: width + 48, height: 1050 })
@@ -76,6 +75,7 @@ try {
     assert.equal(m.position, 'static')
     assert.equal(m.pointerEvents, 'auto')
     assert.equal(m.overflow, false)
+    assert.ok(m.timeout.card.bottom < m.card.y, 'channel card is above global recovery')
     assert.ok(m.input.x - m.card.x >= 18)
     assert.ok(m.grid.bottom < m.card.bottom)
     assert.ok(m.footer.y >= m.card.bottom)
@@ -136,17 +136,23 @@ try {
   await control('最多自动继续次数').fill('0')
   assert.equal(await control('发送继续消息前等待（秒）').isDisabled(), true)
   assert.equal(await control('继续消息内容').isDisabled(), true)
-  await page.getByRole('button', { name: '保存配置' }).click()
+  await page.getByRole('button', { name: '保存全局配置' }).click()
   await page.getByRole('status').filter({ hasText: '已保存；' }).waitFor()
-  assert.deepEqual(await page.evaluate(() => window.writes[0].patch), { headerMode: 'claude-code', recoveryMode: 'continue', maxAutoContinues: 0 })
+  assert.deepEqual(await page.evaluate(() => window.writes[0].patch), { recoveryMode: 'continue', maxAutoContinues: 0 })
+  await page.getByRole('button', { name: '保存渠道配置', exact: true }).click()
+  await page.getByRole('status').filter({ hasText: '渠道配置已保存；' }).waitFor()
+  assert.deepEqual(await page.evaluate(() => window.writes[1]), { ns: 'llm-compat', patch: { providerHeaders: { primary: { headerMode: 'claude-code', customUserAgent: 'ExampleClient/1.0' } } }, revision: 8 })
   assert.equal(await control('流空闲超时（秒）').inputValue(), '300')
-  await control('超时设置的模型渠道').selectOption('backup')
+  await control('模型渠道').selectOption('backup')
   assert.equal(await control('流空闲超时（秒）').inputValue(), '120')
   await control('流空闲超时（秒）').fill('600')
-  await page.getByRole('button', { name: '保存超时', exact: true }).click()
-  await page.getByRole('status').filter({ hasText: '超时已保存；' }).waitFor()
-  assert.deepEqual(await page.evaluate(() => window.writes[1]), { ns: 'llm-pi-ai', patch: { providers: { backup: { streamIdleTimeoutMs: 600000 } } }, revision: 11 })
-  await page.getByRole('form', { name: '流空闲超时设置' }).screenshot({ path: fileURLToPath(new URL('timeout-settings.png', output)) })
+  await page.getByRole('button', { name: '保存渠道配置', exact: true }).click()
+  await page.getByRole('status').filter({ hasText: '渠道配置已保存；' }).waitFor()
+  assert.deepEqual(await page.evaluate(() => window.writes[2]), { ns: 'llm-pi-ai', patch: { providers: { backup: { streamIdleTimeoutMs: 600000 } } }, revision: 11 })
+  await control('模型渠道').selectOption('primary')
+  assert.equal(await control('User-Agent 模式').inputValue(), 'claude-code')
+  assert.equal(await control('流空闲超时（秒）').inputValue(), '300')
+  await page.getByRole('form', { name: '渠道请求设置' }).screenshot({ path: fileURLToPath(new URL('timeout-settings.png', output)) })
   await page.screenshot({ path: fileURLToPath(new URL('dark-continue.png', output)), fullPage: true })
   await page.addStyleTag({ content: `body { background:#f5f6f8; color:#202530; } :root { --dsw-alias-label-primary:#202530; --dsw-alias-label-secondary:#626b7a; --dsw-alias-border-l2:#ccd1db; --dsw-alias-bg-layer-1:#fff; --dsw-alias-bg-layer-2:#f5f6f8; --dsw-alias-settings-card-fill:#fff; --dsw-alias-interactive-bg-hover:#e9edf4; --dsw-alias-brand-primary-new-colorprimary-new-color:#416bdb; }` })
   await control('User-Agent 模式').click()
@@ -176,7 +182,7 @@ try {
   assert.equal(await page.locator('[data-dsh-llm-compat-nav]').count(), 0)
   assert.equal(await page.getByRole('button', { name: '模型请求控制', exact: true }).evaluate(node => getComputedStyle(node.firstElementChild).display === 'none'), false)
   assert.deepEqual(errors, [])
-  const report = { browser: browser.version(), measurements, picker, navStyle, errors, checks: ['collision reproduced with old class', 'isolated layout at 680/480/320px including timeout card padding', 'master/unlimited/zero disabled states', 'native picker styles and keyboard selection/Escape', 'mouse option selection', 'User-Agent and recovery descriptions follow selection', 'React save patch', 'native timeout provider selection, seconds conversion and independent save', 'navigation icon on late mount, inherited color and cleanup'], limitation: 'Isolated React page with reproduced conflicting CSS and theme tokens; not a screenshot of the live Harness settings dialog.' }
+  const report = { browser: browser.version(), measurements, picker, navStyle, errors, checks: ['collision reproduced with old class', 'isolated layout at 680/480/320px including timeout card padding', 'master/unlimited/zero disabled states', 'native picker styles and keyboard selection/Escape', 'mouse option selection', 'User-Agent and recovery descriptions follow selection', 'React save patch', 'channel identity and timeout save independently from global recovery; selection preserves values', 'navigation icon on late mount, inherited color and cleanup'], limitation: 'Isolated React page with reproduced conflicting CSS and theme tokens; not a screenshot of the live Harness settings dialog.' }
   writeFileSync(new URL('report.json', output), JSON.stringify(report, null, 2))
   console.log(JSON.stringify(report, null, 2))
 } finally {

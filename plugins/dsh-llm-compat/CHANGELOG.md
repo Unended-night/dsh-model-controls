@@ -1,5 +1,14 @@
 # Changelog
 
+## 3.2.0 — review candidate
+
+- Group channel selection, User-Agent and stream idle timeout in the upper settings card.
+- Apply identity per native provider ID, including concurrent channels sharing one endpoint and provider-scoped model discovery.
+- Keep channel drafts separate and preserve global retry edits while saving a channel.
+- Report partial saves explicitly when identity succeeds but native timeout fails.
+- Retain previous identity defaults for channels without an explicit override.
+- Keep retries and continuation global, with their own save action.
+
 ## 3.1.0 — review candidate
 
 - Rename the settings page to Model Request Controls / 模型请求控制.

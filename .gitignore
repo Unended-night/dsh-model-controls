@@ -12,6 +12,7 @@ verification/*
 !verification/transport.test.mjs
 !verification/recovery.test.mjs
 !verification/native.test.mjs
+!verification/provider.test.mjs
 !verification/schema.test.mjs
 !verification/harness.mjs
 !verification/current-runtime.mjs

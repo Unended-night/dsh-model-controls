@@ -13,6 +13,12 @@ export const USER_AGENTS = Object.freeze({
   pi: `pi (${platform()} ${release()}; ${arch()})`,
 })
 
+export function providerRequestSettings(settings, provider) {
+  // Legacy defaults remain for existing routes until explicitly configured.
+  // Draft discovery without a route must not inherit another route's identity.
+  return { ...settings, ...(!provider ? { headerMode: 'native' } : settings.providerHeaders?.[provider]) }
+}
+
 export function selectedUserAgent(settings) {
   if (settings.headerMode !== 'custom') return USER_AGENTS[settings.headerMode]
   const value = settings.customUserAgent

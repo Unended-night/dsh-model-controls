@@ -1,6 +1,6 @@
 {
   "name": "dsh-llm-compat",
-  "version": "3.1.0",
+  "version": "3.2.0",
   "private": true,
   "description": "User-Agent selection, visible request retries, optional continuation messages, and per-provider stream idle timeout controls for DeepSeek Harness.",
   "type": "module",

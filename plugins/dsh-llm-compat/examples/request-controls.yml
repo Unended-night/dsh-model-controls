@@ -3,7 +3,10 @@
 - id: llm-compat
   config:
     enabled: true
-    headerMode: native
+    providerHeaders:
+      example-provider: # Replace with an EXISTING Harness provider ID.
+        headerMode: native
+        customUserAgent: custom-client/1.0
     recoveryMode: retry
     maxRetries: 5
     retryDelaySeconds: 2

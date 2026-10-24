@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { fileURLToPath } from 'node:url'
 import { readFileSync, mkdtempSync, rmSync, realpathSync } from 'node:fs'
 import { dirname, join } from 'node:path'
+import { importCurrent } from './current-runtime.mjs'
 import { createCompatibleFetch } from '../plugins/dsh-llm-compat/lib/transport.js'
 import { nativeHarness, collect, fixtureTools, fixtureResponse, openAiFixture, anthropicFixture, responsesFixture } from './harness.mjs'
 
@@ -99,12 +100,16 @@ test('plugin exposes bounded recovery defaults and restores fetch on disposal', 
   const verificationRoot = fileURLToPath(new URL('./', import.meta.url))
   const temporaryHome = mkdtempSync(join(verificationRoot, 'recovery-test-home-'))
   let dispose
+  const { Context } = await importCurrent('@deepseek-ai/cordis')
+  const { default: Llm } = await importCurrent('@deepseek-ai/dsh-llm')
+  const context = new Context()
+  new Llm(context)
   try {
-    apply({ get(name) { if(name==='dshHomePath') return () => temporaryHome }, agents: { get() {} }, logger: { info() {} }, on(event, fn) { if (event === 'dispose') dispose = fn; return () => {} } }, config)
+    apply({ llm: context.llm, get(name) { if(name==='dshHomePath') return () => temporaryHome }, agents: { get() {} }, logger: { info() {} }, on(event, fn) { if (event === 'dispose') dispose = fn; return () => {} } }, config)
     assert.notEqual(globalThis.fetch, before)
     const loaded = JSON.parse(readFileSync(join(temporaryHome, 'logs', 'llm-compat', `${new Date().toISOString().slice(0,10)}.jsonl`), 'utf8').trim())
     assert.equal(loaded.event, 'plugin-loaded')
-    assert.equal(loaded.version, '3.1.0')
+    assert.equal(loaded.version, '3.2.0')
     assert.equal(loaded.maxRetries, 5)
     assert.equal(loaded.continueMessage, undefined)
     assert.equal(typeof dispose, 'function')
