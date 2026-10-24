@@ -53,5 +53,14 @@
     "retry",
     "timeout",
     "user-agent"
-  ]
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Unended-night/dsh-model-controls.git",
+    "directory": "plugins/dsh-model-controls"
+  },
+  "homepage": "https://github.com/Unended-night/dsh-model-controls#readme",
+  "bugs": {
+    "url": "https://github.com/Unended-night/dsh-model-controls/issues"
+  }
 }

@@ -1,8 +1,8 @@
 # 模型请求控制 · Model Request Controls
 
-DeepSeek Harness 的“模型请求控制”插件，当前版本 **4.0.0**。测试目标为 Harness 0.2.1-rc.2 / Node 22.19+。当前是未发布的审核候选；包名为 `dsh-model-controls`，配置 ID 为 `model-controls`。
+DeepSeek Harness 的“模型请求控制”插件，当前版本 **4.0.0**。测试目标为 Harness 0.2.1-rc.2 / Node 22.19+。包名为 `dsh-model-controls`，配置 ID 为 `model-controls`。
 
-安装时在 Harness 的插件管理页填写本地 `.tgz` 文件的完整路径；正式发布后也可填写 GitHub Release 中该文件的下载链接。首次安装完成后重启 Harness。旧开发版应先停用或移除，避免同时启用两套请求控制。4.0 需要重新配置插件，模型渠道和原生超时仍由 Harness 保管。源码仓库的自动 ZIP 不是插件安装包。
+安装时在 Harness 的插件管理页填写 [4.0.0 安装包](https://github.com/Unended-night/dsh-model-controls/releases/download/v4.0.0/dsh-model-controls-4.0.0.tgz) 的下载链接，也可填写已下载 `.tgz` 文件的完整路径。首次安装完成后重启 Harness。旧开发版应先停用或移除，避免同时启用两套请求控制。4.0 需要重新配置插件，模型渠道和原生超时仍由 Harness 保管。源码仓库的自动 ZIP 不是插件安装包。
 
 在 **设置 → 模型请求控制** 中选择 User-Agent、重试方式、次数和等待间隔。配置通过 Harness 原生 settings 接口保存到当前 profile；后续请求读取新配置，重启后继续应用。首次安装或修改插件源码后需要重启加载。
 
@@ -129,7 +129,7 @@ Claude Code 预设为 claude-cli/2.1.296 (external, sdk-cli)，Codex 为 codex_c
 
 源码仓库根目录执行 npm ci --ignore-scripts、npm test；安装 Playwright Chromium 后执行 npm run test:ui。测试使用公开依赖和合成数据，覆盖原生认证保留、五种身份、统一预算、取消、自动继续、工具序列化与三种协议回放。另有已安装宿主的隔离集成测试。
 
-这些检查不等于真实上游验收，也不保证所有第三方插件组合。当前自定义设置页为中文，英文仅用于元数据。安装通过 Harness 插件管理器完成，可使用本地 `.tgz` 路径或正式发布后的 GitHub Release 资源链接。当前尚无公开下载地址；首次安装或更新后重启 Harness，平时保存配置无需重启。跨平台安装尚待验证。
+这些检查不等于真实上游验收，也不保证所有第三方插件组合。当前自定义设置页为中文，英文仅用于元数据。安装通过 Harness 插件管理器完成，可使用本地 `.tgz` 路径或 GitHub Release 资源链接。首次安装或更新后重启 Harness，平时保存配置无需重启。跨平台安装尚待验证。
 
 配置示例见 [请求控制](examples/request-controls.yml) 与 [流空闲超时](examples/stream-timeout.yml)。它们是已有条目的覆盖片段，不是完整 profile；不要重复注册插件或覆盖原有凭据。
 

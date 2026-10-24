@@ -1,6 +1,6 @@
 # Changelog
 
-## 4.0.0 — review candidate
+## 4.0.0 — 2026-10-24
 
 - Use the package name `dsh-model-controls` and settings ID `model-controls`. Install as a new plugin and configure it manually.
 - Default unconfigured channels to native identity; remove global legacy User-Agent defaults.
@@ -29,4 +29,4 @@
 - Show contextual descriptions for the selected User-Agent and recovery modes.
 - Include documentation, configuration examples, reproducible tests and a review package workflow.
 
-These candidates have not been published. Version 4 changes package and settings identifiers.
+Versions 3.1 and 3.2 were local review candidates. Version 4 is the first public release and changes package and settings identifiers.

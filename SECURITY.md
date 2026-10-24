@@ -4,4 +4,4 @@ Do not include API keys, authorization headers, complete request bodies, private
 
 The plugin uses the current request's native authentication and does not keep a credential cache. It does not send telemetry. Local recovery logs include session identifiers, retry counts, delays and error categories; treat these as private diagnostic data. The plugin does not log custom User-Agent values, continuation message text or model request bodies.
 
-No public reporting channel is configured for this unpublished candidate. Establish a private reporting channel before public release; do not publish exploit details or credentials in public issue threads.
+Report security vulnerabilities privately through [GitHub Security Advisories](https://github.com/Unended-night/dsh-model-controls/security/advisories/new). Private vulnerability reporting is enabled for this repository. Use [Issues](https://github.com/Unended-night/dsh-model-controls/issues) for ordinary bugs; do not publish exploit details or credentials there.

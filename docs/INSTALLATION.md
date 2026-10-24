@@ -1,10 +1,10 @@
 # 安装、更新与卸载
 
-插件包名为 `dsh-model-controls`，设置页名称为“模型请求控制”，配置 ID 为 `model-controls`。当前 4.0.0 是本地审核候选，尚无已发布的 GitHub 仓库或下载地址。
+插件包名为 `dsh-model-controls`，设置页名称为“模型请求控制”，配置 ID 为 `model-controls`。源码位于 [GitHub 仓库](https://github.com/Unended-night/dsh-model-controls)，安装包位于 [Releases](https://github.com/Unended-night/dsh-model-controls/releases)。
 
 ## 安装包
 
-从正式 GitHub Release 下载 `dsh-model-controls-<版本>.tgz`，或复制该资源的下载链接。审核阶段使用 `npm run pack:review` 生成的本地 `.tgz`。包内包含运行源码，无需构建或执行安装脚本。
+下载 [dsh-model-controls-4.0.0.tgz](https://github.com/Unended-night/dsh-model-controls/releases/download/v4.0.0/dsh-model-controls-4.0.0.tgz)，或复制其下载链接。开发者也可使用 `npm run pack:review` 生成本地 `.tgz`。包内包含运行源码，无需构建或执行安装脚本。
 
 不要把 GitHub 自动生成的 Source code ZIP 当作安装包：仓库根目录是测试工作区，实际插件位于 `plugins/dsh-model-controls/`。也不要直接把这个仓库的 Git 地址作为插件安装源。
 
@@ -22,10 +22,10 @@
 确认当前安装提供 `dsh` 命令。Windows Desktop 使用应用随附的 `resources/runtime/cli/bin/dsh.cmd`；不要误用另一套 Harness 的 CLI。先完全退出 Harness，再运行：
 
 ```sh
-dsh plugin --profile desktop add "<插件包的完整路径或下载链接>" --ignore-scripts
+dsh plugin --profile desktop add "https://github.com/Unended-night/dsh-model-controls/releases/download/v4.0.0/dsh-model-controls-4.0.0.tgz" --ignore-scripts
 ```
 
-尖括号部分需要替换为实际路径或链接。宿主命令会调用随附 pnpm、检查版本要求，并自动注册包的 bundle。包的 `private: true` 阻止误发 npm，不阻止安装 `.tgz`，发布到 GitHub Releases 时可以保留。
+也可把下载链接替换为本地安装包的完整路径。宿主命令会调用随附 pnpm、检查版本要求，并自动注册包的 bundle。包的 `private: true` 阻止误发 npm，不阻止安装 `.tgz`，发布到 GitHub Releases 时可以保留。
 
 ## 从旧开发版切换
 
@@ -33,7 +33,7 @@ dsh plugin --profile desktop add "<插件包的完整路径或下载链接>" --i
 
 ## 更新与卸载
 
-更新前保存已修改的设置，退出 Harness，先移除当前包，再安装新版本的 `.tgz`，然后重新启动。也可以在宿主插件管理页执行移除、安装，并按提示重启。使用明确的版本链接，不依赖 `latest` 自动变动。当前候选尚未验证跨版本升级。
+更新前保存已修改的设置，退出 Harness，先移除当前包，再安装新版本的 `.tgz`，然后重新启动。也可以在宿主插件管理页执行移除、安装，并按提示重启。使用明确的版本链接，不依赖 `latest` 自动变动。跨版本升级尚未验证。
 
 ```sh
 dsh plugin --profile desktop remove dsh-model-controls
@@ -43,7 +43,7 @@ dsh plugin --profile desktop remove dsh-model-controls
 
 ## 验证范围
 
-发布包的安装验证脚本使用隔离的合成 profile，并调用已安装宿主的包管理、bundle 合成和配置 schema；不访问真实模型或读取日常 profile。它覆盖本地路径安装、HTTP 包下载、同版本重装、配置保留和卸载。实际 GitHub HTTPS 下载、跨版本升级、其他操作系统和插件市场上架仍需后续验收。
+发布包的安装验证脚本使用隔离的合成 profile，并调用已安装宿主的包管理、bundle 合成和配置 schema；不访问真实模型或读取日常 profile。它覆盖本地路径安装、HTTP 包下载、同版本重装、配置保留和卸载。该自动测试不代表实际 GitHub 下载验收；跨版本升级、其他操作系统和插件市场上架仍需后续验收。
 
 ```sh
 npm run pack:review
