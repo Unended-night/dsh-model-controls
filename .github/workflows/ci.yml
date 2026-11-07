@@ -1,4 +1,4 @@
-name: Test and prepare review package
+name: Test and package plugin
 on:
   push:
   pull_request:
@@ -21,11 +21,10 @@ jobs:
       - run: npm test
       - run: npx playwright install --with-deps chromium
       - run: npm run test:ui
-      - run: npm run check:release
-      - run: npm run pack:review
+      - run: npm pack ./plugins/dsh-model-controls --ignore-scripts
       - uses: actions/upload-artifact@v4
         with:
-          name: review-node-${{ matrix.node }}
+          name: plugin-node-${{ matrix.node }}
           path: |
-            dist/
+            dsh-model-controls-*.tgz
             verification/results/settings-ui/

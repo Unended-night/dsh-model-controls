@@ -7,8 +7,7 @@ npm ci --ignore-scripts
 npm test
 npx playwright install chromium
 npm run test:ui
-npm run check:release
-npm run pack:review
+npm pack ./plugins/dsh-model-controls --ignore-scripts
 ```
 
 The lockfile pins the published Harness libraries used by the tests. Tests use synthetic messages, tools, credentials and network responses. They must not call a real model endpoint. Browser tests run an isolated settings page and do not control a running desktop session.
@@ -23,11 +22,11 @@ node verification/recovery-current.mjs openai-completions
 node verification/recovery-current.mjs anthropic-messages
 node verification/timeout-current.mjs
 node verification/provider.test.mjs --host
-node verification/install-current.mjs dist/dsh-model-controls-4.0.0.tgz
+node verification/install-current.mjs dsh-model-controls-4.0.0.tgz
 ```
 
 Model integration scripts use the installed adapter and native agent machinery, with an in-memory configuration editor and simulated network. The installation check uses a disposable synthetic profile, the installed package manager and loopback HTTP downloads. It verifies disk persistence and bundle registration without touching the daily profile. None of these tests verifies an upstream model service or an actual GitHub download.
 
-Stage the candidate files before `npm run pack:review`. It rejects unstaged tracked changes so the runtime tarball and source ZIP correspond to the same reviewed contents. The source manifest records the staged Git tree; generated packages and manifests remain under ignored `dist/`.
+The pack command writes `dsh-model-controls-<version>.tgz` in the repository root. The plugin's `files` field limits that archive to runtime code, metadata, user documentation, licenses and examples. Development scripts and tests are not installed with the plugin. Generated archives and test reports are ignored by Git.
 
 Keep runtime changes small and provider-independent. Add a regression test for meaningful behavior changes. Document timing and cancellation semantics, and keep credentials, local paths, private conversations, runtime archives and captured production responses out of Git. Dependencies keep their own licenses and are not bundled into the plugin.

@@ -6,6 +6,8 @@
 !.env.example
 backups/
 dist/
+/local-maintenance/
+/docs/market-submission/
 verification/*
 !verification/client.test.mjs
 !verification/user-agent.test.mjs
