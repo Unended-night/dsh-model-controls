@@ -1,16 +1,31 @@
-# 模型请求控制 · 使用说明
+# 模型请求控制 · Model Request Controls
 
-在 DeepSeek Harness 中管理每个模型渠道的 User-Agent 和流空闲超时，并设置请求失败后的重试与自动继续行为。
+**请求标识、等待时间、失败后的下一步，都有明确设置。**
+
+在 DeepSeek Harness 中按渠道配置 **User-Agent 请求头与流空闲超时**，自由设置 **重试次数与间隔**，在会话内查看重试进度；也可在重试耗尽后自动发送有次数上限的继续消息。
 
 [下载 4.0.0 安装包](https://github.com/Unended-night/dsh-model-controls/releases/download/v4.0.0/dsh-model-controls-4.0.0.tgz) · [安装与卸载](https://github.com/Unended-night/dsh-model-controls/blob/main/docs/INSTALLATION.md) · [反馈问题](https://github.com/Unended-night/dsh-model-controls/issues)
 
 安装并启用后重启 Harness，在 **设置 → 模型请求控制** 中进行配置。平时保存设置无需重启。
+
+![模型请求控制：渠道设置与全局重试配置](https://raw.githubusercontent.com/Unended-night/dsh-model-controls/main/plugins/dsh-model-controls/assets/settings-overview.png)
+
+*实际插件设置组件的独立预览，使用示例渠道和演示数值。图中 20 次重试、600 秒超时不是默认值。*
+
+| 想调整什么 | 对应设置 |
+| --- | --- |
+| 每个渠道使用不同客户端标识 | User-Agent：原生、Claude Code、Codex、pi、自定义 |
+| 失败后多试几次，或放慢重试节奏 | 额外重试次数、每次重试等待时间、不限次数开关 |
+| 容许模型更久没有输出 | 按渠道调整流空闲超时 |
+| 有限重试耗尽后继续任务 | 自动继续次数、发送前等待、消息正文 |
 
 ## 渠道请求配置
 
 先在上方选择一个已有模型渠道。User-Agent 和流空闲超时都只对所选渠道保存；不同渠道可以使用不同设置。即使两个渠道使用相同接口地址，也不会互相覆盖。
 
 修改后点击 **保存渠道配置**。切换渠道会保留当前页面内的草稿，但不会自动保存；关闭页面会放弃未保存的输入。
+
+![按渠道自定义 User-Agent 和流空闲超时](https://raw.githubusercontent.com/Unended-night/dsh-model-controls/main/plugins/dsh-model-controls/assets/channel-settings.png)
 
 ### User-Agent
 
@@ -56,6 +71,8 @@ User-Agent 是请求中的客户端标识。没有特殊要求时，使用**原�
 
 先执行有限次数的重试。如果仍然失败，等待当前轮次结束且会话空闲后，发送一条可见的继续消息。
 
+![重试次数、重试间隔与自动继续设置](https://raw.githubusercontent.com/Unended-night/dsh-model-controls/main/plugins/dsh-model-controls/assets/continuation-settings.png)
+
 | 设置 | 默认值 | 含义 |
 | --- | --- | --- |
 | 最多自动继续次数 | 3 | 每条手动消息最多触发的自动继续次数；0 表示不发送 |
@@ -94,6 +111,8 @@ User-Agent 是请求中的客户端标识。没有特殊要求时，使用**原�
 ## 使用范围与注意事项
 
 适用于 Windows 上已验证的 Harness 0.2.1-rc.2，支持 OpenAI Chat Completions、OpenAI Responses 和 Anthropic Messages。当前设置页为中文，其他系统上的实际 Harness 使用尚未验证。
+
+插件的 `package.json` 已声明最低 Harness 版本 `>=0.2.1-rc.2`；这不等于所有更高版本都已实测。如果市场 1.70.1 显示“宿主要求未知”，原因是它只为关联 npm 包的条目读取宿主要求，而本插件通过 GitHub Release 分发。该标签不代表未声明要求或已判定不兼容。
 
 重试针对会话中的模型请求失败，包括连接错误和流式响应错误。读取模型列表等操作不会触发插件的会话重试或自动继续。插件还会对缺省工具参数约束和独立空流事件做通用兼容处理。
 
